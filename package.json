@@ -2,11 +2,15 @@
   "name": "sturgeon-flat-app",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "check:supabase-imports": "bash ./scripts/check-supabase-imports.sh"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.2",

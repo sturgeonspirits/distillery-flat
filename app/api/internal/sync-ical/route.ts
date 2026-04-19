@@ -1,11 +1,23 @@
+import { timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
+import { getUnitId } from "@/lib/env";
+import { consumeRateLimit, getRequestIp } from "@/services/rate-limit";
 import { syncAllActiveIcalSources } from "@/services/ical-sync-runner";
 
-const UNIT_ID = "cdd0a039-ef0a-44b5-a68d-339866029d42";
+function constantTimeEquals(a: string, b: string) {
+  const aBuffer = Buffer.from(a);
+  const bBuffer = Buffer.from(b);
+
+  if (aBuffer.length !== bBuffer.length) {
+    return false;
+  }
+
+  return timingSafeEqual(aBuffer, bBuffer);
+}
 
 export async function GET(request: NextRequest) {
-  const secret = request.headers.get("x-sync-secret");
-  const expected = process.env.ICAL_SYNC_SECRET;
+  const secret = request.headers.get("x-sync-secret") || "";
+  const expected = process.env.ICAL_SYNC_SECRET || "";
 
   if (!expected) {
     return NextResponse.json(
@@ -14,17 +26,36 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  if (secret !== expected) {
+  if (!constantTimeEquals(secret, expected)) {
     return NextResponse.json(
       { ok: false, error: "Unauthorized." },
       { status: 401 },
     );
   }
 
-  const result = await syncAllActiveIcalSources(UNIT_ID, "scheduled");
-
-  return NextResponse.json({
-    ok: true,
-    ...result,
+  const rateLimit = await consumeRateLimit({
+    route: "internal-sync-ical",
+    key: getRequestIp(request),
+    windowSeconds: 60,
+    limit: 6,
   });
+
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Too many sync attempts. Try again shortly.",
+      },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": String(rateLimit.retry_after_seconds),
+        },
+      },
+    );
+  }
+
+  const result = await syncAllActiveIcalSources(getUnitId(), "scheduled");
+
+  return NextResponse.json({ ok: true, ...result });
 }

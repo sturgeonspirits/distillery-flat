@@ -1,4 +1,5 @@
 import type { VEvent } from "node-ical";
+import { fetchTrustedIcalText } from "@/lib/ical-security";
 import type { Reservation } from "@/types/reservation";
 import {
   reconcileImportedReservationsForSource,
@@ -94,18 +95,7 @@ export async function syncIcalFeed(
     throw new Error("iCal feed URL is required.");
   }
 
-  const response = await fetch(feed_url, {
-    method: "GET",
-    cache: "no-store",
-  });
-
-  if (!response.ok) {
-    throw new Error(
-      `Failed to fetch ${source_name} iCal feed: ${response.status} ${response.statusText}`,
-    );
-  }
-
-  const icsText = await response.text();
+  const icsText = await fetchTrustedIcalText(feed_url);
 
   const icalModule = await import("node-ical");
   const ical = icalModule.default ?? icalModule;

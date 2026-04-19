@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { getSupabasePublishableKey, getSupabaseUrl } from "@/lib/env";
 
 const PROTECTED_PREFIXES = [
   "/dashboard",
@@ -23,13 +24,11 @@ function isProtectedApi(pathname: string) {
 }
 
 export async function updateSession(request: NextRequest) {
-  let response = NextResponse.next({
-    request,
-  });
+  let response = NextResponse.next({ request });
 
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    getSupabaseUrl(),
+    getSupabasePublishableKey(),
     {
       cookies: {
         getAll() {
@@ -40,9 +39,7 @@ export async function updateSession(request: NextRequest) {
             request.cookies.set(name, value);
           });
 
-          response = NextResponse.next({
-            request,
-          });
+          response = NextResponse.next({ request });
 
           cookiesToSet.forEach(({ name, value, options }) => {
             response.cookies.set(name, value, options);
@@ -52,14 +49,15 @@ export async function updateSession(request: NextRequest) {
     },
   );
 
-  const { data, error } = await supabase.auth.getClaims();
-
-  const isAuthed = Boolean(data?.claims);
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
 
   const pathname = request.nextUrl.pathname;
   const needsAuth = isProtectedPath(pathname) || isProtectedApi(pathname);
 
-  if (!isAuthed && needsAuth) {
+  if (!user && needsAuth) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/login";
     loginUrl.searchParams.set(
@@ -69,7 +67,7 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  if (isAuthed && pathname === "/login") {
+  if (user && pathname === "/login") {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 

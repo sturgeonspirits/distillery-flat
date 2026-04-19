@@ -1,3 +1,4 @@
+import { assertSafeIcalUrl } from "@/lib/ical-security";
 import { createClient } from "@/supabase/server";
 import { supabaseAdmin } from "@/supabase/admin";
 
@@ -36,7 +37,9 @@ export async function getIcalSources(unit_id?: string): Promise<IcalSource[]> {
   return (data ?? []) as IcalSource[];
 }
 
-export async function getActiveIcalSources(unit_id?: string): Promise<IcalSource[]> {
+export async function getActiveIcalSources(
+  unit_id?: string,
+): Promise<IcalSource[]> {
   let query = supabaseAdmin
     .from("ical_sources")
     .select("*")
@@ -78,6 +81,7 @@ export async function createIcalSource(input: {
 }): Promise<IcalSource> {
   const supabase = await createClient();
   const nowIso = new Date().toISOString();
+  const safeFeedUrl = await assertSafeIcalUrl(input.feed_url);
 
   const { data, error } = await supabase
     .from("ical_sources")
@@ -85,7 +89,7 @@ export async function createIcalSource(input: {
       {
         unit_id: input.unit_id,
         source_name: input.source_name.trim(),
-        feed_url: input.feed_url.trim(),
+        feed_url: safeFeedUrl,
         is_active: input.is_active ?? true,
         updated_at: nowIso,
       },
@@ -103,10 +107,7 @@ export async function createIcalSource(input: {
 export async function deleteIcalSource(id: string): Promise<void> {
   const supabase = await createClient();
 
-  const { error } = await supabase
-    .from("ical_sources")
-    .delete()
-    .eq("id", id);
+  const { error } = await supabase.from("ical_sources").delete().eq("id", id);
 
   if (error) {
     throw new Error(`Failed to delete iCal source: ${error.message}`);

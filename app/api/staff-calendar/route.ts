@@ -1,8 +1,22 @@
-import { getReservations } from "@/services/reservations";
-import { getOwnerBlocks } from "@/services/owner-blocks";
+import { timingSafeEqual } from "node:crypto";
+import { supabaseAdmin } from "@/supabase/admin";
+import type { Reservation } from "@/types/reservation";
+import type { OwnerBlock } from "@/types/owner-block";
+import { consumeRateLimit, getRequestIp } from "@/services/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+function constantTimeEquals(a: string, b: string) {
+  const aBuffer = Buffer.from(a);
+  const bBuffer = Buffer.from(b);
+
+  if (aBuffer.length !== bBuffer.length) {
+    return false;
+  }
+
+  return timingSafeEqual(aBuffer, bBuffer);
+}
 
 function escapeIcsText(value: string) {
   return value
@@ -71,27 +85,68 @@ function buildOwnerBlockEvent(event: {
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  const token = url.searchParams.get("token");
-  const expectedToken = process.env.STAFF_ICAL_TOKEN;
+  const token = url.searchParams.get("token") || "";
+  const expectedToken = process.env.STAFF_ICAL_TOKEN || "";
 
   if (!expectedToken) {
     return new Response("Missing STAFF_ICAL_TOKEN", { status: 500 });
   }
 
-  if (token !== expectedToken) {
+  if (!constantTimeEquals(token, expectedToken)) {
     return new Response("Unauthorized", { status: 401 });
   }
 
-  const [reservations, ownerBlocks] = await Promise.all([
-    getReservations(),
-    getOwnerBlocks(),
-  ]);
+  const rateLimit = await consumeRateLimit({
+    route: "staff-calendar",
+    key: getRequestIp(request),
+    windowSeconds: 60,
+    limit: 30,
+  });
 
-  const reservationEvents = reservations
+  if (!rateLimit.allowed) {
+    return new Response("Too many requests", {
+      status: 429,
+      headers: {
+        "Retry-After": String(rateLimit.retry_after_seconds),
+      },
+    });
+  }
+
+  const [{ data: reservations, error: reservationsError }, { data: ownerBlocks, error: ownerBlocksError }] =
+    await Promise.all([
+      supabaseAdmin
+        .from("reservations")
+        .select("id, guest_name, check_in, check_out, channel, status, guest_count")
+        .order("check_in", { ascending: true }),
+      supabaseAdmin
+        .from("owner_blocks")
+        .select("id, title, start_date, end_date, reason")
+        .order("start_date", { ascending: true }),
+    ]);
+
+  if (reservationsError) {
+    return new Response(`Failed to load reservations: ${reservationsError.message}`, {
+      status: 500,
+    });
+  }
+
+  if (ownerBlocksError) {
+    return new Response(`Failed to load owner blocks: ${ownerBlocksError.message}`, {
+      status: 500,
+    });
+  }
+
+  const reservationEvents = ((reservations ?? []) as Pick<
+    Reservation,
+    "id" | "guest_name" | "check_in" | "check_out" | "channel" | "status" | "guest_count"
+  >[])
     .filter((reservation) => reservation.status !== "cancelled")
     .map(buildReservationEvent);
 
-  const ownerBlockEvents = ownerBlocks.map(buildOwnerBlockEvent);
+  const ownerBlockEvents = ((ownerBlocks ?? []) as Pick<
+    OwnerBlock,
+    "id" | "title" | "start_date" | "end_date" | "reason"
+  >[]).map(buildOwnerBlockEvent);
 
   const ics = [
     "BEGIN:VCALENDAR",

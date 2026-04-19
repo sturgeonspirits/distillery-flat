@@ -2,9 +2,16 @@ import { createClient } from "@/supabase/server";
 import { supabaseAdmin } from "@/supabase/admin";
 import type { Reservation } from "@/types/reservation";
 
+function throwReservationWriteError(prefix: string, error: { message: string; code?: string; details?: string | null; hint?: string | null; }) {
+  if (error.code === "23P01") {
+    throw new Error("Those dates overlap an existing reservation. Pick different dates.");
+  }
+
+  throw new Error(`${prefix}: ${error.message}`);
+}
+
 export async function getReservations(): Promise<Reservation[]> {
   const supabase = await createClient();
-
   const { data, error } = await supabase
     .from("reservations")
     .select("*")
@@ -19,7 +26,6 @@ export async function getReservations(): Promise<Reservation[]> {
 
 export async function getReservationById(id: string): Promise<Reservation> {
   const supabase = await createClient();
-
   const { data, error } = await supabase
     .from("reservations")
     .select("*")
@@ -59,7 +65,6 @@ export async function createReservation(input: {
   raw_import?: Record<string, unknown> | null;
 }): Promise<Reservation> {
   const supabase = await createClient();
-
   const { data, error } = await supabase
     .from("reservations")
     .insert([
@@ -79,7 +84,7 @@ export async function createReservation(input: {
     .single();
 
   if (error) {
-    throw new Error(`Failed to create reservation: ${error.message}`);
+    throwReservationWriteError("Failed to create reservation", error);
   }
 
   return data as Reservation;
@@ -99,7 +104,6 @@ export async function updateReservation(input: {
   applied_min_stay: number | null;
 }): Promise<Reservation> {
   const supabase = await createClient();
-
   const { data, error } = await supabase
     .from("reservations")
     .update({
@@ -119,7 +123,7 @@ export async function updateReservation(input: {
     .single();
 
   if (error) {
-    throw new Error(`Failed to update reservation: ${error.message}`);
+    throwReservationWriteError("Failed to update reservation", error);
   }
 
   return data as Reservation;
@@ -127,11 +131,7 @@ export async function updateReservation(input: {
 
 export async function deleteReservation(id: string): Promise<void> {
   const supabase = await createClient();
-
-  const { error } = await supabase
-    .from("reservations")
-    .delete()
-    .eq("id", id);
+  const { error } = await supabase.from("reservations").delete().eq("id", id);
 
   if (error) {
     throw new Error(`Failed to delete reservation: ${error.message}`);
@@ -142,7 +142,6 @@ export async function markReservationManualOverride(
   id: string,
 ): Promise<Reservation> {
   const supabase = await createClient();
-
   const { data, error } = await supabase
     .from("reservations")
     .update({
@@ -166,7 +165,6 @@ export async function clearReservationMissingOnSource(
   id: string,
 ): Promise<Reservation> {
   const supabase = await createClient();
-
   const { data, error } = await supabase
     .from("reservations")
     .update({
@@ -264,7 +262,7 @@ export async function upsertImportedReservation(
       .single();
 
     if (error) {
-      throw new Error(`Failed to update imported reservation: ${error.message}`);
+      throwReservationWriteError("Failed to update imported reservation", error);
     }
 
     return data as Reservation;
@@ -299,7 +297,7 @@ export async function upsertImportedReservation(
     .single();
 
   if (error) {
-    throw new Error(`Failed to insert imported reservation: ${error.message}`);
+    throwReservationWriteError("Failed to insert imported reservation", error);
   }
 
   return data as Reservation;
@@ -309,9 +307,7 @@ export async function reconcileImportedReservationsForSource(input: {
   unit_id: string;
   external_channel: string;
   seen_external_reservation_ids: string[];
-}): Promise<{
-  flagged_missing: number;
-}> {
+}): Promise<{ flagged_missing: number }> {
   const external_channel = input.external_channel.trim();
   const seenIds = [
     ...new Set(
@@ -355,9 +351,7 @@ export async function reconcileImportedReservationsForSource(input: {
     ),
   );
 
-  return {
-    flagged_missing: missingReservations.length,
-  };
+  return { flagged_missing: missingReservations.length };
 }
 
 export function getBookedNights(reservation: Reservation): number {
