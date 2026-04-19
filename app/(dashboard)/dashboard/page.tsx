@@ -13,148 +13,151 @@ export default async function DashboardPage() {
   const pricing = getPricingSnapshot();
   const metrics = getDashboardMetrics(reservations, pricing);
 
+  const benchmarkHelper =
+    metrics.benchmarkDifference >= 0
+      ? `${formatCurrency(metrics.benchmarkDifference)} above monthly benchmark`
+      : `${formatCurrency(Math.abs(metrics.benchmarkDifference))} below monthly benchmark`;
+
   return (
     <div className="space-y-6">
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          label="Monthly Rent Benchmark"
-          value={formatCurrency(pricing.benchmarkMonthlyRent)}
-          helper="Current month-to-month baseline"
-        />
-        <StatCard
-          label="Booked Nights"
-          value={String(metrics.bookedNights)}
-          helper={`About ${metrics.nightsNeeded} nights needed to beat benchmark at base rates`}
-        />
-        <StatCard
-          label="Projected Revenue"
-          value={formatCurrency(metrics.projectedRevenue)}
-          helper="Live Supabase reservation data"
-        />
-        <StatCard
-          label="Benchmark Difference"
-          value={formatCurrency(metrics.benchmarkDifference)}
-          helper="Projected revenue minus $1,300 monthly benchmark"
-        />
-      </section>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-semibold tracking-tight">Dashboard</h1>
+          <p className="mt-1 text-sm text-zinc-600">
+            Live operating view for the distillery flat.
+          </p>
+        </div>
 
-      <section className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-        <Card
-          title="Property Overview"
-          description="Current operating setup for the live booking system"
-        >
-          <div className="space-y-3 text-sm text-stone-700">
-            <p>
-              <span className="font-medium text-stone-900">Listing concept:</span>{" "}
-              Stay at Sturgeon Spirits | 3BR Distillery Flat + Tasting
-            </p>
-            <p>
-              <span className="font-medium text-stone-900">Property:</span>{" "}
-              {PROPERTY_NAME}
-            </p>
-            <p>
-              <span className="font-medium text-stone-900">Current scope:</span>{" "}
-              One live unit with reservations, owner blocks, pricing, iCal sync,
-              lock-code workflow, reconciliation review, and turnover tracking
-            </p>
-            <p>
-              <span className="font-medium text-stone-900">Data source:</span>{" "}
-              Supabase reservations and operations tables
-            </p>
-          </div>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href="/operations"
+            className="inline-flex items-center rounded-lg bg-zinc-900 px-3 py-2 text-sm font-medium text-white"
+          >
+            Open Operations
+          </Link>
+          <Link
+            href="/calendar"
+            className="inline-flex items-center rounded-lg border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-900"
+          >
+            Open Calendar
+          </Link>
+          <Link
+            href="/reservations"
+            className="inline-flex items-center rounded-lg border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-900"
+          >
+            Manage Reservations
+          </Link>
+        </div>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <StatCard
+          label="Projected revenue"
+          value={formatCurrency(metrics.projectedRevenue)}
+          helper={benchmarkHelper}
+        />
+        <StatCard
+          label="Booked nights"
+          value={String(metrics.bookedNights)}
+          helper="Confirmed and active reservation nights"
+        />
+        <StatCard
+          label="Average nightly rate"
+          value={formatCurrency(metrics.avgNightlyRate)}
+          helper="From current pricing baseline"
+        />
+        <StatCard
+          label="Nights to beat benchmark"
+          value={String(metrics.nightsNeeded)}
+          helper="At the current average base rate"
+        />
+        <StatCard
+          label="Upcoming reservations"
+          value={String(reservations.length)}
+          helper="All future reservations in the system"
+        />
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-3">
+        <Card title="Property overview">
+          <dl className="grid gap-3 text-sm">
+            <div>
+              <dt className="font-medium text-zinc-900">Listing concept</dt>
+              <dd className="mt-1 text-zinc-600">
+                Stay at Sturgeon Spirits | 3BR Distillery Flat + Tasting
+              </dd>
+            </div>
+
+            <div>
+              <dt className="font-medium text-zinc-900">Property</dt>
+              <dd className="mt-1 text-zinc-600">{PROPERTY_NAME}</dd>
+            </div>
+
+            <div>
+              <dt className="font-medium text-zinc-900">Current scope</dt>
+              <dd className="mt-1 text-zinc-600">
+                One live unit with reservations, owner blocks, pricing, iCal
+                sync, lock-code workflow, reconciliation review, turnover
+                tracking, staff calendar feed, and protected internal routes.
+              </dd>
+            </div>
+
+            <div>
+              <dt className="font-medium text-zinc-900">Primary data source</dt>
+              <dd className="mt-1 text-zinc-600">
+                Supabase reservations and operations tables.
+              </dd>
+            </div>
+          </dl>
         </Card>
 
-        <Card
-          title="Operations"
-          description="Daily arrivals, departures, turnover, and exceptions"
-        >
-          <div className="space-y-4 text-sm text-stone-700">
-            <p>
-              Use the operations view as the day-of-work screen for arrivals,
+        <Card title="Current status">
+          <ul className="space-y-3 text-sm text-zinc-700">
+            <li>
+              Auth-gated dashboard, reservations, pricing, reports, and settings
+              are live.
+            </li>
+            <li>
+              Database overlap protection is in place, and overlapping
+              reservation attempts are rejected.
+            </li>
+            <li>
+              Staff calendar ICS feed and protected internal iCal sync endpoint
+              are working.
+            </li>
+            <li>
+              Operations view is now the day-of-work screen for arrivals,
               departures, turnover status, turnover notes, owner blocks, missing
               imports, and lock-code exceptions.
-            </p>
-
-            <div className="flex flex-wrap gap-3">
-              <Link
-                href="/operations"
-                className="inline-flex items-center rounded-lg bg-stone-900 px-4 py-2 text-sm font-medium text-white"
-              >
-                Open Operations
-              </Link>
-
-              <Link
-                href="/calendar"
-                className="inline-flex items-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-900"
-              >
-                Open Calendar
-              </Link>
-            </div>
-          </div>
-        </Card>
-      </section>
-
-      <section className="grid gap-4 lg:grid-cols-2">
-        <Card
-          title="What needs to happen next"
-          description="Best next improvements now that operations is live"
-        >
-          <ul className="space-y-2 text-sm text-stone-700">
-            <li className="flex items-start gap-2">
-              <span className="mt-1 h-2 w-2 rounded-full bg-stone-900" />
-              <span>
-                Validate the live operations flow end-to-end with real arrivals,
-                departures, turnover status changes, and reconciliation reviews
-              </span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="mt-1 h-2 w-2 rounded-full bg-stone-900" />
-              <span>
-                Add edit and deactivate controls for iCal sources so feed issues
-                can be managed without deleting source history
-              </span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="mt-1 h-2 w-2 rounded-full bg-stone-900" />
-              <span>
-                Improve imported reservation handling to better distinguish real
-                bookings versus blocked dates when feed data allows
-              </span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="mt-1 h-2 w-2 rounded-full bg-stone-900" />
-              <span>
-                Only after the local workflow is stable, connect a real smart
-                lock provider instead of local-only lock code records
-              </span>
             </li>
           </ul>
         </Card>
 
-        <Card
-          title="Current priorities"
-          description="What this dashboard now supports operationally"
-        >
-          <ul className="space-y-2 text-sm text-stone-700">
-            <li className="flex items-start gap-2">
-              <span className="mt-1 h-2 w-2 rounded-full bg-stone-900" />
-              <span>Reservation create, edit, cancel, and delete workflows</span>
+        <Card title="Current next steps">
+          <ul className="space-y-3 text-sm text-zinc-700">
+            <li>
+              Add the first real active iCal source and confirm imported
+              reservation behavior with live feed data.
             </li>
-            <li className="flex items-start gap-2">
-              <span className="mt-1 h-2 w-2 rounded-full bg-stone-900" />
-              <span>Owner block management and calendar visibility</span>
+            <li>
+              Confirm the scheduled sync path in Netlify after the real feed is
+              connected.
             </li>
-            <li className="flex items-start gap-2">
-              <span className="mt-1 h-2 w-2 rounded-full bg-stone-900" />
-              <span>iCal import sync with missing-on-source review workflow</span>
+            <li>
+              Rotate exposed secrets and tokens, then verify the updated values
+              in Netlify production.
             </li>
-            <li className="flex items-start gap-2">
-              <span className="mt-1 h-2 w-2 rounded-full bg-stone-900" />
-              <span>Turnover checklist status and notes on the operations page</span>
+            <li>
+              Run one final live smoke test across login, dashboard,
+              reservations, owner blocks, preview, settings, and operations.
+            </li>
+            <li>
+              After the local workflow is stable, decide whether to add iCal
+              source edit/deactivate controls and real smart-lock integration.
             </li>
           </ul>
         </Card>
-      </section>
+      </div>
 
       <ReservationTable reservations={reservations} />
     </div>
