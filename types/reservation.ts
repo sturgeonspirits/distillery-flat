@@ -1,0 +1,23 @@
+export type Reservation = {
+  id: string;
+  unit_id: string;
+  guest_name: string;
+  channel: "Airbnb" | "Vrbo" | "Manual" | "iCal";
+  check_in: string;
+  check_out: string;
+  status: "inquiry" | "confirmed" | "checked_in" | "checked_out" | "cancelled";
+  guest_count: number;
+  nightly_rate: number;
+  cleaning_fee: number;
+  applied_pricing_rule_id: string | null;
+  applied_min_stay: number | null;
+  external_channel: string | null;
+  external_reservation_id: string | null;
+  imported_at: string | null;
+  last_synced_at: string | null;
+  source_last_seen_at: string | null;
+  source_missing_since: string | null;
+  reconciliation_status: "ok" | "missing_on_source" | "manual_override" | null;
+  raw_import: Record<string, unknown> | null;
+  created_at: string;
+};
