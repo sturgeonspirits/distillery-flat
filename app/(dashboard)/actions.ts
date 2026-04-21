@@ -8,6 +8,7 @@ import {
   getDefaultNightlyRateForDate,
   getPricingSnapshot,
 } from "@/services/pricing";
+import { upsertPricingSettings } from "@/services/pricing-settings";
 import {
   createReservation,
   deleteReservation,
@@ -28,7 +29,6 @@ import {
   getOwnerBlockById,
   updateOwnerBlock,
 } from "@/services/owner-blocks";
-import { upsertPricingSettings } from "@/services/pricing-settings";
 import { createPricingRule, deletePricingRule } from "@/services/pricing-rules";
 import { createIcalSource, deleteIcalSource } from "@/services/ical-sources";
 import {
@@ -68,7 +68,7 @@ export async function createReservationAction(
       | "cancelled";
     const guest_count = Number(formData.get("guest_count") || 1);
     const submitted_nightly_rate = Number(formData.get("nightly_rate") || 0);
-    const cleaning_fee = Number(formData.get("cleaning_fee") || 0);
+    const cleaningFeeValue = String(formData.get("cleaning_fee") ?? "").trim();
 
     if (!guest_name) {
       return { ok: false, error: "Guest name is required." };
@@ -94,11 +94,23 @@ export async function createReservationAction(
           ? submitted_nightly_rate
           : defaultNightlyRate;
 
+    const cleaning_fee =
+      cleaningFeeValue === ""
+        ? pricingSnapshot.cleaningFee
+        : Number(cleaningFeeValue);
+
     if (nightly_rate <= 0) {
       return {
         ok: false,
         error:
           "No nightly rate found for this stay. Add a pricing rule or set a valid base rate.",
+      };
+    }
+
+    if (!Number.isFinite(cleaning_fee) || cleaning_fee < 0) {
+      return {
+        ok: false,
+        error: "Cleaning fee must be 0 or greater.",
       };
     }
 
@@ -131,7 +143,9 @@ export async function createReservationAction(
     return {
       ok: false,
       error:
-        error instanceof Error ? error.message : "Could not create reservation.",
+        error instanceof Error
+          ? error.message
+          : "Could not create reservation.",
     };
   }
 }
@@ -160,7 +174,7 @@ export async function updateReservationAction(
       | "cancelled";
     const guest_count = Number(formData.get("guest_count") || 1);
     const submitted_nightly_rate = Number(formData.get("nightly_rate") || 0);
-    const cleaning_fee = Number(formData.get("cleaning_fee") || 0);
+    const cleaningFeeValue = String(formData.get("cleaning_fee") ?? "").trim();
 
     if (!id) {
       return { ok: false, error: "Reservation id is required." };
@@ -193,11 +207,23 @@ export async function updateReservationAction(
           ? submitted_nightly_rate
           : defaultNightlyRate;
 
+    const cleaning_fee =
+      cleaningFeeValue === ""
+        ? pricingSnapshot.cleaningFee
+        : Number(cleaningFeeValue);
+
     if (nightly_rate <= 0) {
       return {
         ok: false,
         error:
           "No nightly rate found for this stay. Add a pricing rule or set a valid base rate.",
+      };
+    }
+
+    if (!Number.isFinite(cleaning_fee) || cleaning_fee < 0) {
+      return {
+        ok: false,
+        error: "Cleaning fee must be 0 or greater.",
       };
     }
 
@@ -235,7 +261,9 @@ export async function updateReservationAction(
     return {
       ok: false,
       error:
-        error instanceof Error ? error.message : "Could not update reservation.",
+        error instanceof Error
+          ? error.message
+          : "Could not update reservation.",
     };
   }
 }
@@ -244,6 +272,7 @@ export async function cancelReservationAction(formData: FormData) {
   await requireUser();
 
   const id = String(formData.get("id") || "");
+
   if (!id) {
     throw new Error("Reservation id is required.");
   }
@@ -277,6 +306,7 @@ export async function deleteReservationAction(formData: FormData) {
   await requireUser();
 
   const id = String(formData.get("id") || "");
+
   if (!id) {
     throw new Error("Reservation id is required.");
   }
@@ -294,6 +324,7 @@ export async function markReservationManualOverrideAction(formData: FormData) {
   await requireUser();
 
   const reservationId = String(formData.get("reservationId") || "");
+
   if (!reservationId) {
     throw new Error("Reservation id is required.");
   }
@@ -310,6 +341,7 @@ export async function clearReservationMissingOnSourceAction(formData: FormData) 
   await requireUser();
 
   const reservationId = String(formData.get("reservationId") || "");
+
   if (!reservationId) {
     throw new Error("Reservation id is required.");
   }
@@ -419,6 +451,7 @@ export async function deleteOwnerBlockAction(formData: FormData) {
   await requireUser();
 
   const id = String(formData.get("id") || "");
+
   if (!id) {
     throw new Error("Owner block id is required.");
   }
@@ -530,6 +563,7 @@ export async function deletePricingRuleAction(formData: FormData) {
   await requireUser();
 
   const id = String(formData.get("id") || "");
+
   if (!id) {
     throw new Error("Pricing rule id is required.");
   }
@@ -544,6 +578,7 @@ export async function revokeLockAccessCodeAction(formData: FormData) {
   await requireUser();
 
   const id = String(formData.get("id") || "");
+
   if (!id) {
     throw new Error("Lock access code id is required.");
   }
@@ -560,6 +595,7 @@ export async function regenerateLockAccessCodeAction(formData: FormData) {
   await requireUser();
 
   const id = String(formData.get("id") || "");
+
   if (!id) {
     throw new Error("Lock access code id is required.");
   }
@@ -613,6 +649,7 @@ export async function deleteIcalSourceAction(formData: FormData) {
   await requireUser();
 
   const id = String(formData.get("id") || "");
+
   if (!id) {
     throw new Error("iCal source id is required.");
   }
@@ -626,6 +663,7 @@ export async function syncIcalSourceAction(formData: FormData) {
   await requireUser();
 
   const id = String(formData.get("id") || "");
+
   if (!id) {
     throw new Error("iCal source id is required.");
   }
@@ -700,6 +738,7 @@ export async function deleteSmartLockAction(formData: FormData) {
   await requireUser();
 
   const id = String(formData.get("id") || "");
+
   if (!id) {
     throw new Error("Smart lock id is required.");
   }

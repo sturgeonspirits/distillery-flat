@@ -7,6 +7,7 @@ import {
   getReservationRevenue,
 } from "@/services/reservations";
 import { getPricingRules } from "@/services/pricing-rules";
+import { getPricingSnapshot } from "@/services/pricing";
 import { getLockAccessCodes } from "@/services/lock-access-codes";
 import { getSmartLocks } from "@/services/locks";
 import {
@@ -86,12 +87,14 @@ export default async function ReservationsPage({
   const resolvedSearchParams = (await searchParams) ?? {};
   const filter = resolvedSearchParams.filter === "missing" ? "missing" : "all";
 
-  const [reservations, pricingRules, lockCodes, smartLocks] = await Promise.all([
-    getReservations(),
-    getPricingRules(),
-    getLockAccessCodes(),
-    getSmartLocks(UNIT_ID),
-  ]);
+  const [reservations, pricingRules, pricing, lockCodes, smartLocks] =
+    await Promise.all([
+      getReservations(),
+      getPricingRules(),
+      getPricingSnapshot(),
+      getLockAccessCodes(),
+      getSmartLocks(UNIT_ID),
+    ]);
 
   const pricingRuleNameById = new Map(
     pricingRules.map((rule) => [rule.id, rule.name || "Unnamed rule"]),
@@ -128,125 +131,116 @@ export default async function ReservationsPage({
 
   return (
     <div className="space-y-6">
-      <NewReservationForm />
+      <NewReservationForm defaultCleaningFee={pricing.cleaningFee} />
 
-      <Card
-        title="Reservations"
-        description="All direct, imported, and manual bookings"
-      >
-        <div className="mb-4 flex flex-wrap items-center gap-2">
+      <Card title="Reservations">
+        <div className="mb-4 flex flex-wrap gap-2">
           <Link
             href="/reservations"
-            className={[
-              "rounded-lg border px-3 py-1.5 text-sm",
+            className={`rounded-full px-3 py-1 text-sm font-medium ${
               filter === "all"
-                ? "border-stone-900 bg-stone-900 text-white"
-                : "border-stone-300 text-stone-700 hover:bg-stone-50",
-            ].join(" ")}
+                ? "bg-stone-900 text-white"
+                : "bg-stone-100 text-stone-700"
+            }`}
           >
             All Reservations
           </Link>
 
           <Link
             href="/reservations?filter=missing"
-            className={[
-              "rounded-lg border px-3 py-1.5 text-sm",
+            className={`rounded-full px-3 py-1 text-sm font-medium ${
               filter === "missing"
-                ? "border-red-700 bg-red-700 text-white"
-                : "border-red-200 text-red-700 hover:bg-red-50",
-            ].join(" ")}
+                ? "bg-stone-900 text-white"
+                : "bg-stone-100 text-stone-700"
+            }`}
           >
             Missing on Source ({missingCount})
           </Link>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-stone-200 text-sm">
-            <thead>
-              <tr className="text-left text-stone-500">
-                <th className="px-4 py-3 font-medium">Guest</th>
-                <th className="px-4 py-3 font-medium">Dates</th>
-                <th className="px-4 py-3 font-medium">Channel</th>
-                <th className="px-4 py-3 font-medium">Source</th>
-                <th className="px-4 py-3 font-medium">Reconciliation</th>
-                <th className="px-4 py-3 font-medium">Status</th>
-                <th className="px-4 py-3 font-medium">Pricing Rule</th>
-                <th className="px-4 py-3 font-medium">Lock Access</th>
-                <th className="px-4 py-3 font-medium">Rate</th>
-                <th className="px-4 py-3 font-medium">Revenue</th>
-                <th className="px-4 py-3 font-medium">Actions</th>
-              </tr>
-            </thead>
+        {visibleReservations.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-stone-300 bg-stone-50 px-4 py-8 text-center text-sm text-stone-600">
+            {filter === "missing"
+              ? "No reservations are currently missing from a source feed."
+              : "No reservations yet."}
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-stone-200 text-sm">
+              <thead>
+                <tr className="text-left text-xs uppercase tracking-wide text-stone-500">
+                  <th className="px-3 py-2">Guest</th>
+                  <th className="px-3 py-2">Dates</th>
+                  <th className="px-3 py-2">Channel</th>
+                  <th className="px-3 py-2">Source</th>
+                  <th className="px-3 py-2">Reconciliation</th>
+                  <th className="px-3 py-2">Status</th>
+                  <th className="px-3 py-2">Pricing Rule</th>
+                  <th className="px-3 py-2">Lock Access</th>
+                  <th className="px-3 py-2">Rate</th>
+                  <th className="px-3 py-2">Revenue</th>
+                  <th className="px-3 py-2">Actions</th>
+                </tr>
+              </thead>
 
-            <tbody className="divide-y divide-stone-200">
-              {visibleReservations.map((reservation) => {
-                const nights = getBookedNights(reservation);
-                const revenue = getReservationRevenue(reservation);
+              <tbody className="divide-y divide-stone-100">
+                {visibleReservations.map((reservation) => {
+                  const nights = getBookedNights(reservation);
+                  const revenue = getReservationRevenue(reservation);
+                  const appliedRuleName = reservation.applied_pricing_rule_id
+                    ? pricingRuleNameById.get(reservation.applied_pricing_rule_id) ??
+                      "Deleted rule"
+                    : "Manual / none";
 
-                const appliedRuleName = reservation.applied_pricing_rule_id
-                  ? pricingRuleNameById.get(reservation.applied_pricing_rule_id) ??
-                    "Deleted rule"
-                  : "Manual / none";
+                  const sourceLabel =
+                    reservation.external_channel ||
+                    (reservation.channel === "Manual"
+                      ? "Manual entry"
+                      : "Direct");
 
-                const sourceLabel =
-                  reservation.external_channel ||
-                  (reservation.channel === "Manual" ? "Manual entry" : "Direct");
+                  const reservationLockCodes =
+                    lockCodesByReservationId.get(reservation.id) || [];
 
-                const reservationLockCodes =
-                  lockCodesByReservationId.get(reservation.id) || [];
-
-                return (
-                  <tr key={reservation.id} className="align-top">
-                    <td className="px-4 py-4">
-                      <div>
-                        <p className="font-medium text-stone-900">
+                  return (
+                    <tr key={reservation.id} className="align-top">
+                      <td className="px-3 py-3">
+                        <div className="font-medium text-stone-900">
                           {reservation.guest_name}
-                        </p>
-                        <p className="mt-1 text-xs text-stone-500">
+                        </div>
+                        <div className="text-stone-500">
                           {reservation.guest_count} guest
                           {reservation.guest_count === 1 ? "" : "s"}
-                        </p>
-                      </div>
-                    </td>
+                        </div>
+                      </td>
 
-                    <td className="px-4 py-4 text-stone-700">
-                      <div>
-                        <p>
+                      <td className="px-3 py-3 text-stone-700">
+                        <div>
                           {formatDate(reservation.check_in)} –{" "}
                           {formatDate(reservation.check_out)}
-                        </p>
-                        <p className="mt-1 text-xs text-stone-500">
+                        </div>
+                        <div className="text-stone-500">
                           {nights} night{nights === 1 ? "" : "s"}
-                        </p>
-                      </div>
-                    </td>
+                        </div>
+                      </td>
 
-                    <td className="px-4 py-4 text-stone-700">
-                      <span className="rounded-full bg-stone-100 px-2 py-1 text-xs font-medium text-stone-700">
+                      <td className="px-3 py-3 text-stone-700">
                         {reservation.channel}
-                      </span>
-                    </td>
+                      </td>
 
-                    <td className="px-4 py-4 text-stone-700">
-                      <div>
-                        <p>{sourceLabel}</p>
+                      <td className="px-3 py-3 text-stone-700">
+                        <div>{sourceLabel}</div>
                         {reservation.external_reservation_id ? (
-                          <p className="mt-1 text-xs text-stone-500">
+                          <div className="text-stone-500">
                             Ref: {reservation.external_reservation_id}
-                          </p>
+                          </div>
                         ) : null}
-                      </div>
-                    </td>
+                      </td>
 
-                    <td className="px-4 py-4 text-stone-700">
-                      <div>
+                      <td className="px-3 py-3">
                         <span
-                          className={[
-                            "rounded-full px-2 py-1 text-xs font-medium",
-                            getReconciliationBadgeClass(
-                              reservation.reconciliation_status,
-                            ),
-                          ].join(" ")}
+                          className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${getReconciliationBadgeClass(
+                            reservation.reconciliation_status,
+                          )}`}
                         >
                           {getReconciliationLabel(
                             reservation.reconciliation_status,
@@ -254,85 +248,67 @@ export default async function ReservationsPage({
                         </span>
 
                         {reservation.source_last_seen_at ? (
-                          <p className="mt-1 text-xs text-stone-500">
+                          <div className="mt-1 text-xs text-stone-500">
                             Last seen:{" "}
                             {formatDateTime(reservation.source_last_seen_at)}
-                          </p>
+                          </div>
                         ) : null}
 
                         {reservation.source_missing_since ? (
-                          <p className="mt-1 text-xs text-red-600">
+                          <div className="mt-1 text-xs text-stone-500">
                             Missing since:{" "}
                             {formatDateTime(reservation.source_missing_since)}
-                          </p>
+                          </div>
                         ) : null}
-                      </div>
-                    </td>
+                      </td>
 
-                    <td className="px-4 py-4">
-                      <span className="rounded-full bg-stone-100 px-2 py-1 text-xs font-medium text-stone-700">
+                      <td className="px-3 py-3 text-stone-700">
                         {reservation.status}
-                      </span>
-                    </td>
+                      </td>
 
-                    <td className="px-4 py-4 text-stone-700">
-                      <div>
-                        <p>{appliedRuleName}</p>
-                        <p className="mt-1 text-xs text-stone-500">
+                      <td className="px-3 py-3 text-stone-700">
+                        <div>{appliedRuleName}</div>
+                        <div className="text-stone-500">
                           Min stay: {reservation.applied_min_stay ?? "—"}
-                        </p>
-                      </div>
-                    </td>
+                        </div>
+                      </td>
 
-                    <td className="px-4 py-4 text-stone-700">
-                      {reservationLockCodes.length > 0 ? (
-                        <div className="space-y-2">
-                          {reservationLockCodes.map((lockCode) => (
-                            <div
-                              key={lockCode.id}
-                              className="rounded-lg border border-stone-200 bg-stone-50 p-2"
-                            >
-                              <p className="text-xs font-medium text-stone-900">
-                                {smartLockNameById.get(lockCode.smart_lock_id) ||
-                                  "Smart lock"}
-                              </p>
-                              <p className="mt-1 font-mono text-sm text-stone-900">
-                                {lockCode.code}
-                              </p>
-                              <p className="mt-1">
-                                <span
-                                  className={[
-                                    "rounded-full px-2 py-1 text-[10px] font-medium",
-                                    getLockStatusBadgeClass(lockCode.status),
-                                  ].join(" ")}
+                      <td className="px-3 py-3">
+                        {reservationLockCodes.length > 0 ? (
+                          <div className="space-y-3">
+                            {reservationLockCodes.map((lockCode) => (
+                              <div
+                                key={lockCode.id}
+                                className="rounded-xl border border-stone-200 p-3"
+                              >
+                                <div className="font-medium text-stone-900">
+                                  {smartLockNameById.get(lockCode.smart_lock_id) ||
+                                    "Smart lock"}
+                                </div>
+
+                                <div className="mt-1 font-mono text-sm text-stone-700">
+                                  {lockCode.code}
+                                </div>
+
+                                <div
+                                  className={`mt-2 inline-flex rounded-full px-2 py-1 text-xs font-medium ${getLockStatusBadgeClass(
+                                    lockCode.status,
+                                  )}`}
                                 >
                                   {lockCode.status}
-                                </span>
-                              </p>
-                              <p className="mt-1 text-xs text-stone-500">
-                                Start: {formatDateTime(lockCode.starts_at)}
-                              </p>
-                              <p className="text-xs text-stone-500">
-                                End: {formatDateTime(lockCode.ends_at)}
-                              </p>
+                                </div>
 
-                              <div className="mt-2 flex flex-wrap gap-2">
-                                <form action={regenerateLockAccessCodeAction}>
-                                  <input
-                                    type="hidden"
-                                    name="id"
-                                    value={lockCode.id}
-                                  />
-                                  <button
-                                    type="submit"
-                                    className="rounded-lg border border-stone-300 px-2 py-1 text-xs text-stone-700 hover:bg-stone-100"
-                                  >
-                                    Regenerate
-                                  </button>
-                                </form>
+                                <div className="mt-2 text-xs text-stone-500">
+                                  <div>
+                                    Start: {formatDateTime(lockCode.starts_at)}
+                                  </div>
+                                  <div>
+                                    End: {formatDateTime(lockCode.ends_at)}
+                                  </div>
+                                </div>
 
-                                {lockCode.status !== "revoked" ? (
-                                  <form action={revokeLockAccessCodeAction}>
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                  <form action={regenerateLockAccessCodeAction}>
                                     <input
                                       type="hidden"
                                       name="id"
@@ -340,86 +316,97 @@ export default async function ReservationsPage({
                                     />
                                     <button
                                       type="submit"
-                                      className="rounded-lg border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50"
+                                      className="text-xs font-medium text-stone-700 underline"
                                     >
-                                      Revoke
+                                      Regenerate
                                     </button>
                                   </form>
-                                ) : null}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="text-xs text-stone-500">No lock code</p>
-                      )}
-                    </td>
 
-                    <td className="px-4 py-4 text-stone-700">
-                      <div>
-                        <p>{formatCurrency(Number(reservation.nightly_rate))}</p>
-                        <p className="mt-1 text-xs text-stone-500">
+                                  {lockCode.status !== "revoked" ? (
+                                    <form action={revokeLockAccessCodeAction}>
+                                      <input
+                                        type="hidden"
+                                        name="id"
+                                        value={lockCode.id}
+                                      />
+                                      <button
+                                        type="submit"
+                                        className="text-xs font-medium text-red-600 underline"
+                                      >
+                                        Revoke
+                                      </button>
+                                    </form>
+                                  ) : null}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-stone-500">No lock code</div>
+                        )}
+                      </td>
+
+                      <td className="px-3 py-3 text-stone-700">
+                        <div>
+                          {formatCurrency(Number(reservation.nightly_rate))}
+                        </div>
+                        <div className="text-stone-500">
                           Cleaning:{" "}
                           {formatCurrency(Number(reservation.cleaning_fee))}
-                        </p>
-                      </div>
-                    </td>
+                        </div>
+                      </td>
 
-                    <td className="px-4 py-4 font-medium text-stone-900">
-                      {formatCurrency(revenue)}
-                    </td>
+                      <td className="px-3 py-3 font-medium text-stone-900">
+                        {formatCurrency(revenue)}
+                      </td>
 
-                    <td className="px-4 py-4">
-                      <div className="flex flex-col gap-2">
-                        <Link
-                          href={`/reservations/${reservation.id}/edit`}
-                          className="rounded-lg border border-stone-300 px-3 py-1.5 text-center text-xs font-medium text-stone-700 hover:bg-stone-50"
-                        >
-                          Edit
-                        </Link>
+                      <td className="px-3 py-3">
+                        <div className="flex flex-col items-start gap-2">
+                          <Link
+                            href={`/reservations/${reservation.id}/edit`}
+                            className="text-sm font-medium text-stone-700 underline"
+                          >
+                            Edit
+                          </Link>
 
-                        {reservation.status !== "cancelled" ? (
-                          <form action={cancelReservationAction}>
-                            <input type="hidden" name="id" value={reservation.id} />
+                          {reservation.status !== "cancelled" ? (
+                            <form action={cancelReservationAction}>
+                              <input
+                                type="hidden"
+                                name="id"
+                                value={reservation.id}
+                              />
+                              <button
+                                type="submit"
+                                className="text-sm font-medium text-amber-700 underline"
+                              >
+                                Cancel
+                              </button>
+                            </form>
+                          ) : null}
+
+                          <form action={deleteReservationAction}>
+                            <input
+                              type="hidden"
+                              name="id"
+                              value={reservation.id}
+                            />
                             <button
                               type="submit"
-                              className="rounded-lg border border-amber-200 px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-50"
+                              className="text-sm font-medium text-red-600 underline"
                             >
-                              Cancel
+                              Delete
                             </button>
                           </form>
-                        ) : null}
-
-                        <form action={deleteReservationAction}>
-                          <input type="hidden" name="id" value={reservation.id} />
-                          <button
-                            type="submit"
-                            className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50"
-                          >
-                            Delete
-                          </button>
-                        </form>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-
-              {visibleReservations.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={11}
-                    className="px-4 py-8 text-center text-stone-500"
-                  >
-                    {filter === "missing"
-                      ? "No reservations are currently missing from a source feed."
-                      : "No reservations yet."}
-                  </td>
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
-        </div>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Card>
     </div>
   );
