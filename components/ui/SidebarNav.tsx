@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { href: "/pricing", label: "Pricing" },
   { href: "/reports", label: "Reports" },
   { href: "/operations", label: "Operations" },
+  { href: "/guest-portal", label: "Guest Portal" },
   { href: "/settings", label: "Settings" },
 ];
 
@@ -30,22 +31,18 @@ export default function SidebarNav() {
   const pathname = usePathname();
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="border-b border-stone-200 px-5 py-5">
-        <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-stone-500">
-            Property
-          </p>
-          <h2 className="mt-1 text-lg font-semibold text-stone-900">
-            Distillery Flat
-          </h2>
-          <p className="mt-1 text-sm text-stone-600">
-            Stay at Sturgeon Spirits
-          </p>
-        </div>
+    <aside className="space-y-6 rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
+      <div>
+        <p className="text-xs font-medium uppercase tracking-wide text-stone-500">
+          Property
+        </p>
+        <h2 className="mt-1 text-lg font-semibold text-stone-900">
+          Distillery Flat
+        </h2>
+        <p className="mt-1 text-sm text-stone-600">Stay at Sturgeon Spirits</p>
       </div>
 
-      <nav className="flex-1 px-4 py-4">
+      <nav>
         <ul className="space-y-1">
           {NAV_ITEMS.map((item) => {
             const active = isItemActive(pathname, item.href);
@@ -61,17 +58,15 @@ export default function SidebarNav() {
         </ul>
       </nav>
 
-      <div className="border-t border-stone-200 px-5 py-4">
-        <div className="rounded-2xl bg-stone-100 p-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-stone-500">
-            Phase 1
-          </p>
-          <p className="mt-1 text-sm text-stone-700">
-            Dashboard, reservations, calendar, pricing, reports, operations, and
-            settings.
-          </p>
-        </div>
+      <div className="rounded-xl bg-stone-50 p-3">
+        <p className="text-xs font-medium uppercase tracking-wide text-stone-500">
+          Phase 2
+        </p>
+        <p className="mt-1 text-sm text-stone-600">
+          Guest portal, reservation-linked communications, and future OTA-ready
+          workflow hooks.
+        </p>
       </div>
-    </div>
+    </aside>
   );
 }

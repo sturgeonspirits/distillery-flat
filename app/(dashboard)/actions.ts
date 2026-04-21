@@ -37,6 +37,13 @@ import {
 } from "@/services/ical-sync-runner";
 import { createSmartLock, deleteSmartLock } from "@/services/locks";
 import { upsertTurnoverChecklist } from "@/services/turnovers";
+import {
+  createGuestPortalSessionForReservation,
+  deleteGuestPortalContent,
+  resolveGuestPortalMessageRequest,
+  revokeGuestPortalSession,
+  upsertGuestPortalContent,
+} from "@/services/guest-portal";
 
 const UNIT_ID = "cdd0a039-ef0a-44b5-a68d-339866029d42";
 
@@ -776,4 +783,112 @@ export async function saveTurnoverChecklistAction(formData: FormData) {
   });
 
   revalidatePath("/operations");
+}
+
+export async function createGuestPortalSessionAction(formData: FormData) {
+  await requireUser();
+
+  const reservation_id = String(formData.get("reservation_id") || "");
+
+  if (!reservation_id) {
+    throw new Error("Reservation id is required.");
+  }
+
+  await createGuestPortalSessionForReservation(reservation_id);
+
+  revalidatePath("/guest-portal");
+}
+
+export async function revokeGuestPortalSessionAction(formData: FormData) {
+  await requireUser();
+
+  const id = String(formData.get("id") || "");
+
+  if (!id) {
+    throw new Error("Guest portal session id is required.");
+  }
+
+  await revokeGuestPortalSession(id);
+
+  revalidatePath("/guest-portal");
+}
+
+export async function upsertGuestPortalContentAction(
+  _prevState: FormActionState,
+  formData: FormData,
+): Promise<FormActionState> {
+  await requireUser();
+
+  try {
+    const section_key = String(formData.get("section_key") || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]+/g, "-");
+    const title = String(formData.get("title") || "").trim();
+    const body = String(formData.get("body") || "").trim();
+    const sort_order = Number(formData.get("sort_order") || 100);
+    const is_active = formData.get("is_active") === "on";
+
+    if (!section_key) {
+      return { ok: false, error: "Section key is required." };
+    }
+
+    if (!title) {
+      return { ok: false, error: "Title is required." };
+    }
+
+    if (!body) {
+      return { ok: false, error: "Body is required." };
+    }
+
+    await upsertGuestPortalContent({
+      section_key,
+      title,
+      body,
+      sort_order,
+      is_active,
+    });
+
+    revalidatePath("/guest-portal");
+
+    return { ok: true, error: null };
+  } catch (error) {
+    return {
+      ok: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Could not save guest portal content.",
+    };
+  }
+}
+
+export async function deleteGuestPortalContentAction(formData: FormData) {
+  await requireUser();
+
+  const id = String(formData.get("id") || "");
+
+  if (!id) {
+    throw new Error("Guest portal content id is required.");
+  }
+
+  await deleteGuestPortalContent(id);
+
+  revalidatePath("/guest-portal");
+}
+
+export async function resolveGuestPortalMessageRequestAction(
+  formData: FormData,
+) {
+  await requireUser();
+
+  const id = String(formData.get("id") || "");
+
+  if (!id) {
+    throw new Error("Guest portal message request id is required.");
+  }
+
+  await resolveGuestPortalMessageRequest(id);
+
+  revalidatePath("/guest-portal");
 }

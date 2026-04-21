@@ -1,8 +1,11 @@
-Updated Distillery Flat icon set using the redrawn app-icon artwork.
+Clean Distillery Flat icon pack
 
-Install
-1. Copy files from /app into your repo's app folder.
-2. Copy files from /public into your repo's public folder.
+This version uses only the main redrawn master icon.
+The smaller preview icons from the mockup sheet are excluded.
+
+Install:
+1. Copy /app/icon.png and /app/apple-icon.png into your repo's app folder.
+2. Copy everything in /public into your repo's public folder.
 3. Ensure app/layout.tsx metadata includes:
 
 export const metadata = {
@@ -13,15 +16,3 @@ export const metadata = {
     apple: "/apple-touch-icon.png",
   },
 };
-
-Included
-- app/icon.png
-- app/apple-icon.png
-- public/favicon.ico
-- public/apple-touch-icon.png
-- public/web-app-manifest-192x192.png
-- public/web-app-manifest-512x512.png
-- public/maskable-icon-192x192.png
-- public/maskable-icon-512x512.png
-- public/mstile-150x150.png
-- public/site.webmanifest
