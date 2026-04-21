@@ -6,47 +6,36 @@ import { getDashboardMetrics } from "@/services/reports";
 
 export default async function ReportsPage() {
   const reservations = await getUpcomingReservations();
-  const pricing = getPricingSnapshot();
+  const pricing = await getPricingSnapshot();
   const metrics = getDashboardMetrics(reservations, pricing);
 
   return (
     <div className="space-y-6">
-      <Card
-        title="Reports"
-        description="Performance tracking against the current long-term rental benchmark"
-      >
-        <div className="grid gap-4 md:grid-cols-4">
-          <div className="rounded-xl border border-stone-200 bg-white p-4">
-            <p className="text-sm font-medium text-stone-600">Benchmark</p>
-            <p className="mt-2 text-2xl font-semibold text-stone-900">
-              {formatCurrency(pricing.benchmarkMonthlyRent)}
-            </p>
-          </div>
+      <h1 className="text-3xl font-semibold tracking-tight">Reports</h1>
 
-          <div className="rounded-xl border border-stone-200 bg-white p-4">
-            <p className="text-sm font-medium text-stone-600">
-              Projected Revenue
-            </p>
-            <p className="mt-2 text-2xl font-semibold text-stone-900">
-              {formatCurrency(metrics.projectedRevenue)}
-            </p>
-          </div>
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <Card title="Benchmark">
+          <p className="text-2xl font-semibold">
+            {formatCurrency(pricing.benchmarkMonthlyRent)}
+          </p>
+        </Card>
 
-          <div className="rounded-xl border border-stone-200 bg-white p-4">
-            <p className="text-sm font-medium text-stone-600">Booked Nights</p>
-            <p className="mt-2 text-2xl font-semibold text-stone-900">
-              {metrics.bookedNights}
-            </p>
-          </div>
+        <Card title="Projected Revenue">
+          <p className="text-2xl font-semibold">
+            {formatCurrency(metrics.projectedRevenue)}
+          </p>
+        </Card>
 
-          <div className="rounded-xl border border-stone-200 bg-white p-4">
-            <p className="text-sm font-medium text-stone-600">Difference</p>
-            <p className="mt-2 text-2xl font-semibold text-stone-900">
-              {formatCurrency(metrics.benchmarkDifference)}
-            </p>
-          </div>
-        </div>
-      </Card>
+        <Card title="Booked Nights">
+          <p className="text-2xl font-semibold">{metrics.bookedNights}</p>
+        </Card>
+
+        <Card title="Difference">
+          <p className="text-2xl font-semibold">
+            {formatCurrency(metrics.benchmarkDifference)}
+          </p>
+        </Card>
+      </div>
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import Card from "@/components/ui/Card";
+import BasePricingSettingsForm from "@/components/dashboard/BasePricingSettingsForm";
 import NewPricingRuleForm from "@/components/dashboard/NewPricingRuleForm";
 import { deletePricingRuleAction } from "@/app/(dashboard)/actions";
 import { formatCurrency, formatDate } from "@/lib/format";
@@ -11,7 +12,7 @@ import { getPricingRules } from "@/services/pricing-rules";
 
 export default async function PricingPage() {
   const [pricing, rules] = await Promise.all([
-    Promise.resolve(getPricingSnapshot()),
+    getPricingSnapshot(),
     getPricingRules(),
   ]);
 
@@ -28,13 +29,18 @@ export default async function PricingPage() {
 
   return (
     <div className="space-y-6">
-      <NewPricingRuleForm />
+      <Card
+        title="Base Pricing Settings"
+        description="These values now live in the database and can be changed here without editing backend code."
+      >
+        <BasePricingSettingsForm pricing={pricing} />
+      </Card>
 
       <Card
-        title="Pricing Rules"
-        description="Base rates, seasonal logic, and event overrides"
+        title="Pricing Summary"
+        description="Current base rates and benchmark math"
       >
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <div className="rounded-xl border border-stone-200 bg-stone-50 p-4">
             <p className="text-sm font-medium text-stone-900">Base Weekday Rate</p>
             <p className="mt-2 text-2xl font-semibold text-stone-900">
@@ -57,7 +63,23 @@ export default async function PricingPage() {
           </div>
 
           <div className="rounded-xl border border-stone-200 bg-stone-50 p-4">
-            <p className="text-sm font-medium text-stone-900">Average Base Nightly Rate</p>
+            <p className="text-sm font-medium text-stone-900">Cleaning Fee</p>
+            <p className="mt-2 text-2xl font-semibold text-stone-900">
+              {formatCurrency(pricing.cleaningFee)}
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-stone-200 bg-stone-50 p-4">
+            <p className="text-sm font-medium text-stone-900">Monthly Benchmark</p>
+            <p className="mt-2 text-2xl font-semibold text-stone-900">
+              {formatCurrency(pricing.benchmarkMonthlyRent)}
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-stone-200 bg-stone-50 p-4">
+            <p className="text-sm font-medium text-stone-900">
+              Average Base Nightly Rate
+            </p>
             <p className="mt-2 text-2xl font-semibold text-stone-900">
               {formatCurrency(avgBaseRate)}
             </p>
@@ -67,6 +89,8 @@ export default async function PricingPage() {
           </div>
         </div>
       </Card>
+
+      <NewPricingRuleForm />
 
       <Card
         title="Active Pricing Rules"

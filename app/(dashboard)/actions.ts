@@ -5,6 +5,10 @@ import { requireUser } from "@/lib/auth";
 import { assertUnitIsAvailable } from "@/services/availability";
 import { assertStayMeetsMinimum } from "@/services/booking-pricing";
 import {
+  getDefaultNightlyRateForDate,
+  getPricingSnapshot,
+} from "@/services/pricing";
+import {
   createReservation,
   deleteReservation,
   getReservationById,
@@ -24,6 +28,7 @@ import {
   getOwnerBlockById,
   updateOwnerBlock,
 } from "@/services/owner-blocks";
+import { upsertPricingSettings } from "@/services/pricing-settings";
 import { createPricingRule, deletePricingRule } from "@/services/pricing-rules";
 import { createIcalSource, deleteIcalSource } from "@/services/ical-sources";
 import {
@@ -76,15 +81,24 @@ export async function createReservationAction(
     });
 
     const pricing = await assertStayMeetsMinimum(check_in, check_out);
+    const pricingSnapshot = await getPricingSnapshot();
+    const defaultNightlyRate = getDefaultNightlyRateForDate(
+      check_in,
+      pricingSnapshot,
+    );
 
     const nightly_rate =
-      pricing.nightly_rate > 0 ? pricing.nightly_rate : submitted_nightly_rate;
+      pricing.nightly_rate > 0
+        ? pricing.nightly_rate
+        : submitted_nightly_rate > 0
+          ? submitted_nightly_rate
+          : defaultNightlyRate;
 
     if (nightly_rate <= 0) {
       return {
         ok: false,
         error:
-          "No nightly rate found for this stay. Add a pricing rule or enter a nightly rate.",
+          "No nightly rate found for this stay. Add a pricing rule or set a valid base rate.",
       };
     }
 
@@ -117,9 +131,7 @@ export async function createReservationAction(
     return {
       ok: false,
       error:
-        error instanceof Error
-          ? error.message
-          : "Could not create reservation.",
+        error instanceof Error ? error.message : "Could not create reservation.",
     };
   }
 }
@@ -168,15 +180,24 @@ export async function updateReservationAction(
     });
 
     const pricing = await assertStayMeetsMinimum(check_in, check_out);
+    const pricingSnapshot = await getPricingSnapshot();
+    const defaultNightlyRate = getDefaultNightlyRateForDate(
+      check_in,
+      pricingSnapshot,
+    );
 
     const nightly_rate =
-      pricing.nightly_rate > 0 ? pricing.nightly_rate : submitted_nightly_rate;
+      pricing.nightly_rate > 0
+        ? pricing.nightly_rate
+        : submitted_nightly_rate > 0
+          ? submitted_nightly_rate
+          : defaultNightlyRate;
 
     if (nightly_rate <= 0) {
       return {
         ok: false,
         error:
-          "No nightly rate found for this stay. Add a pricing rule or enter a nightly rate.",
+          "No nightly rate found for this stay. Add a pricing rule or set a valid base rate.",
       };
     }
 
@@ -214,9 +235,7 @@ export async function updateReservationAction(
     return {
       ok: false,
       error:
-        error instanceof Error
-          ? error.message
-          : "Could not update reservation.",
+        error instanceof Error ? error.message : "Could not update reservation.",
     };
   }
 }
@@ -225,7 +244,6 @@ export async function cancelReservationAction(formData: FormData) {
   await requireUser();
 
   const id = String(formData.get("id") || "");
-
   if (!id) {
     throw new Error("Reservation id is required.");
   }
@@ -259,7 +277,6 @@ export async function deleteReservationAction(formData: FormData) {
   await requireUser();
 
   const id = String(formData.get("id") || "");
-
   if (!id) {
     throw new Error("Reservation id is required.");
   }
@@ -277,7 +294,6 @@ export async function markReservationManualOverrideAction(formData: FormData) {
   await requireUser();
 
   const reservationId = String(formData.get("reservationId") || "");
-
   if (!reservationId) {
     throw new Error("Reservation id is required.");
   }
@@ -294,7 +310,6 @@ export async function clearReservationMissingOnSourceAction(formData: FormData) 
   await requireUser();
 
   const reservationId = String(formData.get("reservationId") || "");
-
   if (!reservationId) {
     throw new Error("Reservation id is required.");
   }
@@ -404,7 +419,6 @@ export async function deleteOwnerBlockAction(formData: FormData) {
   await requireUser();
 
   const id = String(formData.get("id") || "");
-
   if (!id) {
     throw new Error("Owner block id is required.");
   }
@@ -413,6 +427,59 @@ export async function deleteOwnerBlockAction(formData: FormData) {
 
   revalidatePath("/calendar");
   revalidatePath("/dashboard");
+  revalidatePath("/operations");
+}
+
+export async function updatePricingSettingsAction(formData: FormData) {
+  await requireUser();
+
+  const base_weekday_rate = Number(formData.get("base_weekday_rate") || 0);
+  const base_weekend_rate = Number(formData.get("base_weekend_rate") || 0);
+  const distillery_premium = Number(formData.get("distillery_premium") || 0);
+  const eaa_weekly_target = Number(formData.get("eaa_weekly_target") || 0);
+  const cleaning_fee = Number(formData.get("cleaning_fee") || 0);
+  const benchmark_monthly_rent = Number(
+    formData.get("benchmark_monthly_rent") || 0,
+  );
+
+  if (base_weekday_rate <= 0) {
+    throw new Error("Base weekday rate must be greater than 0.");
+  }
+
+  if (base_weekend_rate <= 0) {
+    throw new Error("Base weekend rate must be greater than 0.");
+  }
+
+  if (distillery_premium < 0) {
+    throw new Error("Distillery premium cannot be negative.");
+  }
+
+  if (eaa_weekly_target < 0) {
+    throw new Error("EAA weekly target cannot be negative.");
+  }
+
+  if (cleaning_fee < 0) {
+    throw new Error("Cleaning fee cannot be negative.");
+  }
+
+  if (benchmark_monthly_rent < 0) {
+    throw new Error("Monthly benchmark cannot be negative.");
+  }
+
+  await upsertPricingSettings({
+    base_weekday_rate,
+    base_weekend_rate,
+    distillery_premium,
+    eaa_weekly_target,
+    cleaning_fee,
+    benchmark_monthly_rent,
+  });
+
+  revalidatePath("/pricing");
+  revalidatePath("/dashboard");
+  revalidatePath("/calendar");
+  revalidatePath("/reservations");
+  revalidatePath("/reports");
   revalidatePath("/operations");
 }
 
@@ -463,7 +530,6 @@ export async function deletePricingRuleAction(formData: FormData) {
   await requireUser();
 
   const id = String(formData.get("id") || "");
-
   if (!id) {
     throw new Error("Pricing rule id is required.");
   }
@@ -478,7 +544,6 @@ export async function revokeLockAccessCodeAction(formData: FormData) {
   await requireUser();
 
   const id = String(formData.get("id") || "");
-
   if (!id) {
     throw new Error("Lock access code id is required.");
   }
@@ -495,7 +560,6 @@ export async function regenerateLockAccessCodeAction(formData: FormData) {
   await requireUser();
 
   const id = String(formData.get("id") || "");
-
   if (!id) {
     throw new Error("Lock access code id is required.");
   }
@@ -534,6 +598,7 @@ export async function createIcalSourceAction(
     });
 
     revalidatePath("/settings");
+
     return { ok: true, error: null };
   } catch (error) {
     return {
@@ -548,7 +613,6 @@ export async function deleteIcalSourceAction(formData: FormData) {
   await requireUser();
 
   const id = String(formData.get("id") || "");
-
   if (!id) {
     throw new Error("iCal source id is required.");
   }
@@ -562,7 +626,6 @@ export async function syncIcalSourceAction(formData: FormData) {
   await requireUser();
 
   const id = String(formData.get("id") || "");
-
   if (!id) {
     throw new Error("iCal source id is required.");
   }
@@ -622,6 +685,7 @@ export async function createSmartLockAction(
     });
 
     revalidatePath("/settings");
+
     return { ok: true, error: null };
   } catch (error) {
     return {
@@ -636,7 +700,6 @@ export async function deleteSmartLockAction(formData: FormData) {
   await requireUser();
 
   const id = String(formData.get("id") || "");
-
   if (!id) {
     throw new Error("Smart lock id is required.");
   }

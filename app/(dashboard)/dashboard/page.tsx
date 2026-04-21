@@ -10,7 +10,7 @@ import { getDashboardMetrics } from "@/services/reports";
 
 export default async function DashboardPage() {
   const reservations = await getUpcomingReservations();
-  const pricing = getPricingSnapshot();
+  const pricing = await getPricingSnapshot();
   const metrics = getDashboardMetrics(reservations, pricing);
 
   const benchmarkHelper =
