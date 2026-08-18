@@ -1,8 +1,10 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import Card from "@/components/ui/Card";
 import { createSmartLockAction } from "@/app/(dashboard)/actions";
+import { getDefaultUnitId, RENTAL_UNITS } from "@/lib/units";
+import { SMART_LOCK_PROVIDER_OPTIONS } from "@/lib/smart-locks";
 
 const initialFormActionState = {
   ok: false,
@@ -10,6 +12,7 @@ const initialFormActionState = {
 };
 
 export default function NewSmartLockForm() {
+  const [accessScope, setAccessScope] = useState("unit");
   const [state, formAction, isPending] = useActionState(
     createSmartLockAction,
     initialFormActionState,
@@ -26,7 +29,7 @@ export default function NewSmartLockForm() {
   return (
     <Card
       title="Add Smart Lock"
-      description="Register a lock for this unit so confirmed reservations can get pending access codes"
+      description="Register lock hardware for an apartment door or shared entry"
     >
       <form
         ref={formRef}
@@ -47,11 +50,51 @@ export default function NewSmartLockForm() {
 
         <div>
           <label className="mb-1 block text-sm font-medium text-stone-700">
+            Access Scope
+          </label>
+          <select
+            name="access_scope"
+            value={accessScope}
+            onChange={(event) => setAccessScope(event.target.value)}
+            className="w-full rounded-xl border border-stone-300 px-3 py-2"
+          >
+            <option value="unit">Apartment door</option>
+            <option value="shared">Shared exterior door</option>
+          </select>
+        </div>
+
+        {accessScope === "shared" ? (
+          <input type="hidden" name="unit_id" value={getDefaultUnitId()} />
+        ) : (
+          <div>
+            <label className="mb-1 block text-sm font-medium text-stone-700">
+              Rental Space
+            </label>
+            <select
+              name="unit_id"
+              defaultValue={getDefaultUnitId()}
+              className="w-full rounded-xl border border-stone-300 px-3 py-2"
+            >
+              {RENTAL_UNITS.map((unit) => (
+                <option key={unit.id} value={unit.id}>
+                  {unit.name} ({unit.level}, {unit.bedrooms}BR)
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        <div>
+          <label className="mb-1 block text-sm font-medium text-stone-700">
             Lock Name
           </label>
           <input
             name="name"
-            placeholder="Front Door"
+            placeholder={
+              accessScope === "shared"
+                ? "Shared Exterior Door"
+                : "Angel's Share Apartment Door"
+            }
             required
             className="w-full rounded-xl border border-stone-300 px-3 py-2"
           />
@@ -63,14 +106,14 @@ export default function NewSmartLockForm() {
           </label>
           <select
             name="provider"
-            defaultValue="other"
+            defaultValue="schlage_engage"
             className="w-full rounded-xl border border-stone-300 px-3 py-2"
           >
-            <option value="remoteLock">RemoteLock</option>
-            <option value="schlage">Schlage</option>
-            <option value="yale">Yale</option>
-            <option value="august">August</option>
-            <option value="other">Other</option>
+            {SMART_LOCK_PROVIDER_OPTIONS.map((provider) => (
+              <option key={provider.value} value={provider.value}>
+                {provider.label}
+              </option>
+            ))}
           </select>
         </div>
 

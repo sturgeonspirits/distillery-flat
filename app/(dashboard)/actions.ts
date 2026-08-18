@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
+import { assertRentalUnitId, getDefaultUnitId } from "@/lib/units";
 import { assertUnitIsAvailable } from "@/services/availability";
 import { assertStayMeetsMinimum } from "@/services/booking-pricing";
 import {
@@ -35,7 +36,11 @@ import {
   syncAllActiveIcalSources,
   syncIcalSourceWithMonitoring,
 } from "@/services/ical-sync-runner";
-import { createSmartLock, deleteSmartLock } from "@/services/locks";
+import {
+  createMissingDefaultSmartLocks,
+  createSmartLock,
+  deleteSmartLock,
+} from "@/services/locks";
 import { upsertTurnoverChecklist } from "@/services/turnovers";
 import {
   createGuestPortalSessionForReservation,
@@ -45,7 +50,7 @@ import {
   upsertGuestPortalContent,
 } from "@/services/guest-portal";
 
-const UNIT_ID = "cdd0a039-ef0a-44b5-a68d-339866029d42";
+const UNIT_ID = getDefaultUnitId();
 
 type FormActionState = {
   ok: boolean;
@@ -67,6 +72,7 @@ export async function createReservationAction(
       | "iCal";
     const check_in = String(formData.get("check_in") || "");
     const check_out = String(formData.get("check_out") || "");
+    const unit_id = assertRentalUnitId(String(formData.get("unit_id") || UNIT_ID));
     const status = String(formData.get("status") || "confirmed") as
       | "inquiry"
       | "confirmed"
@@ -82,13 +88,13 @@ export async function createReservationAction(
     }
 
     await assertUnitIsAvailable({
-      unit_id: UNIT_ID,
+      unit_id,
       start_date: check_in,
       end_date: check_out,
     });
 
-    const pricing = await assertStayMeetsMinimum(check_in, check_out);
-    const pricingSnapshot = await getPricingSnapshot();
+    const pricing = await assertStayMeetsMinimum(check_in, check_out, unit_id);
+    const pricingSnapshot = await getPricingSnapshot(unit_id);
     const defaultNightlyRate = getDefaultNightlyRateForDate(
       check_in,
       pricingSnapshot,
@@ -122,7 +128,7 @@ export async function createReservationAction(
     }
 
     const reservation = await createReservation({
-      unit_id: UNIT_ID,
+      unit_id,
       guest_name,
       channel,
       check_in,
@@ -173,6 +179,7 @@ export async function updateReservationAction(
       | "iCal";
     const check_in = String(formData.get("check_in") || "");
     const check_out = String(formData.get("check_out") || "");
+    const unit_id = assertRentalUnitId(String(formData.get("unit_id") || UNIT_ID));
     const status = String(formData.get("status") || "confirmed") as
       | "inquiry"
       | "confirmed"
@@ -194,14 +201,14 @@ export async function updateReservationAction(
     const existing = await getReservationById(id);
 
     await assertUnitIsAvailable({
-      unit_id: existing.unit_id,
+      unit_id,
       start_date: check_in,
       end_date: check_out,
       exclude_reservation_id: id,
     });
 
-    const pricing = await assertStayMeetsMinimum(check_in, check_out);
-    const pricingSnapshot = await getPricingSnapshot();
+    const pricing = await assertStayMeetsMinimum(check_in, check_out, unit_id);
+    const pricingSnapshot = await getPricingSnapshot(unit_id);
     const defaultNightlyRate = getDefaultNightlyRateForDate(
       check_in,
       pricingSnapshot,
@@ -236,6 +243,7 @@ export async function updateReservationAction(
 
     const reservation = await updateReservation({
       id,
+      unit_id,
       guest_name,
       channel,
       check_in,
@@ -249,6 +257,7 @@ export async function updateReservationAction(
     });
 
     const datesChanged =
+      existing.unit_id !== reservation.unit_id ||
       existing.check_in !== reservation.check_in ||
       existing.check_out !== reservation.check_out;
     const statusChanged = existing.status !== reservation.status;
@@ -288,6 +297,7 @@ export async function cancelReservationAction(formData: FormData) {
 
   const reservation = await updateReservation({
     id: existing.id,
+    unit_id: existing.unit_id,
     guest_name: existing.guest_name,
     channel: existing.channel,
     check_in: existing.check_in,
@@ -372,15 +382,16 @@ export async function createOwnerBlockAction(
     const start_date = String(formData.get("start_date") || "");
     const end_date = String(formData.get("end_date") || "");
     const reason = String(formData.get("reason") || "").trim();
+    const unit_id = assertRentalUnitId(String(formData.get("unit_id") || UNIT_ID));
 
     await assertUnitIsAvailable({
-      unit_id: UNIT_ID,
+      unit_id,
       start_date,
       end_date,
     });
 
     await createOwnerBlock({
-      unit_id: UNIT_ID,
+      unit_id,
       title,
       start_date,
       end_date,
@@ -474,6 +485,7 @@ export async function updatePricingSettingsAction(formData: FormData) {
   await requireUser();
 
   const base_weekday_rate = Number(formData.get("base_weekday_rate") || 0);
+  const unit_id = assertRentalUnitId(String(formData.get("unit_id") || UNIT_ID));
   const base_weekend_rate = Number(formData.get("base_weekend_rate") || 0);
   const distillery_premium = Number(formData.get("distillery_premium") || 0);
   const eaa_weekly_target = Number(formData.get("eaa_weekly_target") || 0);
@@ -508,6 +520,7 @@ export async function updatePricingSettingsAction(formData: FormData) {
 
   await upsertPricingSettings({
     base_weekday_rate,
+    unit_id,
     base_weekend_rate,
     distillery_premium,
     eaa_weekly_target,
@@ -624,6 +637,7 @@ export async function createIcalSourceAction(
   try {
     const source_name = String(formData.get("source_name") || "").trim();
     const feed_url = String(formData.get("feed_url") || "").trim();
+    const unit_id = assertRentalUnitId(String(formData.get("unit_id") || UNIT_ID));
 
     if (!source_name) {
       return { ok: false, error: "Source name is required." };
@@ -634,7 +648,7 @@ export async function createIcalSourceAction(
     }
 
     await createIcalSource({
-      unit_id: UNIT_ID,
+      unit_id,
       source_name,
       feed_url,
       is_active: true,
@@ -690,7 +704,7 @@ export async function syncAllIcalSourcesAction() {
   await requireUser();
 
   try {
-    await syncAllActiveIcalSources(UNIT_ID, "manual");
+    await syncAllActiveIcalSources(undefined, "manual");
   } finally {
     revalidatePath("/settings");
     revalidatePath("/reservations");
@@ -708,7 +722,14 @@ export async function createSmartLockAction(
 
   try {
     const name = String(formData.get("name") || "").trim();
-    const provider = String(formData.get("provider") || "other").trim();
+    const provider = String(
+      formData.get("provider") || "schlage_engage",
+    ).trim();
+    const access_scope = String(formData.get("access_scope") || "unit");
+    const applies_to_all_units = access_scope === "shared";
+    const unit_id = applies_to_all_units
+      ? UNIT_ID
+      : assertRentalUnitId(String(formData.get("unit_id") || UNIT_ID));
     const external_lock_id = String(
       formData.get("external_lock_id") || "",
     ).trim();
@@ -722,10 +743,11 @@ export async function createSmartLockAction(
     }
 
     await createSmartLock({
-      unit_id: UNIT_ID,
+      unit_id,
       name,
       provider,
       external_lock_id: external_lock_id || null,
+      applies_to_all_units,
       is_active: true,
     });
 
@@ -739,6 +761,14 @@ export async function createSmartLockAction(
         error instanceof Error ? error.message : "Could not create smart lock.",
     };
   }
+}
+
+export async function createDefaultSmartLocksAction() {
+  await requireUser();
+
+  await createMissingDefaultSmartLocks();
+
+  revalidatePath("/settings");
 }
 
 export async function deleteSmartLockAction(formData: FormData) {
@@ -759,6 +789,7 @@ export async function saveTurnoverChecklistAction(formData: FormData) {
   await requireUser();
 
   const turnover_date = String(formData.get("turnoverDate") || "");
+  const unit_id = assertRentalUnitId(String(formData.get("unit_id") || UNIT_ID));
   const status = String(formData.get("status") || "not_started");
   const notes = String(formData.get("notes") || "").trim();
 
@@ -776,7 +807,7 @@ export async function saveTurnoverChecklistAction(formData: FormData) {
   }
 
   await upsertTurnoverChecklist({
-    unit_id: UNIT_ID,
+    unit_id,
     turnover_date,
     status,
     notes: notes || null,
@@ -828,6 +859,7 @@ export async function upsertGuestPortalContentAction(
     const body = String(formData.get("body") || "").trim();
     const sort_order = Number(formData.get("sort_order") || 100);
     const is_active = formData.get("is_active") === "on";
+    const unit_id = assertRentalUnitId(String(formData.get("unit_id") || UNIT_ID));
 
     if (!section_key) {
       return { ok: false, error: "Section key is required." };
@@ -843,6 +875,7 @@ export async function upsertGuestPortalContentAction(
 
     await upsertGuestPortalContent({
       section_key,
+      unit_id,
       title,
       body,
       sort_order,

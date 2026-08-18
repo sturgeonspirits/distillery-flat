@@ -24,7 +24,7 @@ export default async function LoginPage({
             Sturgeon Spirits
           </p>
           <h1 className="mt-2 text-2xl font-semibold tracking-tight text-stone-900">
-            Distillery Flat Operations
+            Distillery Flats Operations
           </h1>
           <p className="mt-2 text-sm text-stone-600">
             Sign in to access the operations dashboard.

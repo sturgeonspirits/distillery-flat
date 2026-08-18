@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useRef } from "react";
 import Card from "@/components/ui/Card";
 import { createOwnerBlockAction } from "@/app/(dashboard)/actions";
+import { getDefaultUnitId, RENTAL_UNITS } from "@/lib/units";
 
 const initialFormActionState = {
   ok: false,
@@ -44,6 +45,23 @@ export default function NewOwnerBlockForm() {
             Owner block created.
           </div>
         ) : null}
+
+        <div>
+          <label className="mb-1 block text-sm font-medium text-stone-700">
+            Rental Space
+          </label>
+          <select
+            name="unit_id"
+            defaultValue={getDefaultUnitId()}
+            className="w-full rounded-xl border border-stone-300 px-3 py-2"
+          >
+            {RENTAL_UNITS.map((unit) => (
+              <option key={unit.id} value={unit.id}>
+                {unit.name} ({unit.bedrooms}BR)
+              </option>
+            ))}
+          </select>
+        </div>
 
         <div>
           <label className="mb-1 block text-sm font-medium text-stone-700">

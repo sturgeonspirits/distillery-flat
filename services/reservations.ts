@@ -92,6 +92,7 @@ export async function createReservation(input: {
 
 export async function updateReservation(input: {
   id: string;
+  unit_id: string;
   guest_name: string;
   channel: "Airbnb" | "Vrbo" | "Manual" | "iCal";
   check_in: string;
@@ -107,6 +108,7 @@ export async function updateReservation(input: {
   const { data, error } = await supabase
     .from("reservations")
     .update({
+      unit_id: input.unit_id,
       guest_name: input.guest_name,
       channel: input.channel,
       check_in: input.check_in,

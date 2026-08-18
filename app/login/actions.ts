@@ -2,7 +2,11 @@
 
 import { redirect } from "next/navigation";
 import { isPasswordAuthDisabled } from "@/lib/auth-bypass";
-import { createClient } from "@/supabase/server";
+import {
+  createSessionForUser,
+  deleteSession,
+  verifyPasswordCredentials,
+} from "@/lib/session-auth";
 
 export type SignInState = {
   error: string | null;
@@ -24,13 +28,13 @@ export async function signInAction(
     return { error: "Email and password are required." };
   }
 
-  const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
+  try {
+    if (!verifyPasswordCredentials({ email, password })) {
+      return { error: "Invalid email or password." };
+    }
 
-  if (error) {
+    await createSessionForUser(email.toLowerCase());
+  } catch {
     return { error: "Invalid email or password." };
   }
 
@@ -42,7 +46,6 @@ export async function signOutAction() {
     redirect("/dashboard");
   }
 
-  const supabase = await createClient();
-  await supabase.auth.signOut();
+  await deleteSession();
   redirect("/login");
 }

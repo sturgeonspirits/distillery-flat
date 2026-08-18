@@ -17,8 +17,7 @@ import {
   revokeLockAccessCodeAction,
 } from "@/app/(dashboard)/actions";
 import { formatCurrency, formatDate } from "@/lib/format";
-
-const UNIT_ID = "cdd0a039-ef0a-44b5-a68d-339866029d42";
+import { getRentalUnitName, RENTAL_UNITS } from "@/lib/units";
 
 type ReservationsPageProps = {
   searchParams?: Promise<{
@@ -87,14 +86,29 @@ export default async function ReservationsPage({
   const resolvedSearchParams = (await searchParams) ?? {};
   const filter = resolvedSearchParams.filter === "missing" ? "missing" : "all";
 
-  const [reservations, pricingRules, pricing, lockCodes, smartLocks] =
+  const [
+    reservations,
+    pricingRules,
+    pricing,
+    lockCodes,
+    smartLocks,
+    unitPricingSnapshots,
+  ] =
     await Promise.all([
       getReservations(),
       getPricingRules(),
       getPricingSnapshot(),
       getLockAccessCodes(),
-      getSmartLocks(UNIT_ID),
+      getSmartLocks(),
+      Promise.all(RENTAL_UNITS.map((unit) => getPricingSnapshot(unit.id))),
     ]);
+
+  const defaultCleaningFeesByUnit = Object.fromEntries(
+    RENTAL_UNITS.map((unit, index) => [
+      unit.id,
+      unitPricingSnapshots[index].cleaningFee,
+    ]),
+  );
 
   const pricingRuleNameById = new Map(
     pricingRules.map((rule) => [rule.id, rule.name || "Unnamed rule"]),
@@ -131,7 +145,10 @@ export default async function ReservationsPage({
 
   return (
     <div className="space-y-6">
-      <NewReservationForm defaultCleaningFee={pricing.cleaningFee} />
+      <NewReservationForm
+        defaultCleaningFee={pricing.cleaningFee}
+        defaultCleaningFeesByUnit={defaultCleaningFeesByUnit}
+      />
 
       <Card title="Reservations">
         <div className="mb-4 flex flex-wrap gap-2">
@@ -171,6 +188,7 @@ export default async function ReservationsPage({
                 <tr className="text-left text-xs uppercase tracking-wide text-stone-500">
                   <th className="px-3 py-2">Guest</th>
                   <th className="px-3 py-2">Dates</th>
+                  <th className="px-3 py-2">Space</th>
                   <th className="px-3 py-2">Channel</th>
                   <th className="px-3 py-2">Source</th>
                   <th className="px-3 py-2">Reconciliation</th>
@@ -221,6 +239,10 @@ export default async function ReservationsPage({
                         <div className="text-stone-500">
                           {nights} night{nights === 1 ? "" : "s"}
                         </div>
+                      </td>
+
+                      <td className="px-3 py-3 text-stone-700">
+                        {getRentalUnitName(reservation.unit_id)}
                       </td>
 
                       <td className="px-3 py-3 text-stone-700">

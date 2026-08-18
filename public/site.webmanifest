@@ -1,7 +1,7 @@
 {
-  "name": "Distillery Flat",
-  "short_name": "Distillery Flat",
-  "description": "Distillery Flat web app",
+  "name": "Distillery Flats",
+  "short_name": "Flats",
+  "description": "Distillery Flats operations dashboard",
   "theme_color": "#F1F1E7",
   "background_color": "#FFFFFF",
   "display": "standalone",

@@ -37,7 +37,7 @@ export default function SidebarNav() {
           Property
         </p>
         <h2 className="mt-1 text-lg font-semibold text-stone-900">
-          Distillery Flat
+          Distillery Flats
         </h2>
         <p className="mt-1 text-sm text-stone-600">Stay at Sturgeon Spirits</p>
       </div>

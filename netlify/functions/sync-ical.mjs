@@ -1,9 +1,12 @@
-export default async () => {
-  const baseUrl = process.env.SYNC_BASE_URL;
+export default async function syncIcal() {
+  const baseUrl =
+    process.env.APP_URL || process.env.SYNC_BASE_URL || process.env.URL;
   const secret = process.env.ICAL_SYNC_SECRET;
 
   if (!baseUrl) {
-    return new Response("Missing SYNC_BASE_URL", { status: 500 });
+    return new Response("Missing APP_URL, SYNC_BASE_URL, or Netlify URL", {
+      status: 500,
+    });
   }
 
   if (!secret) {
@@ -25,7 +28,7 @@ export default async () => {
       "content-type": "application/json",
     },
   });
-};
+}
 
 export const config = {
   schedule: "*/30 * * * *",

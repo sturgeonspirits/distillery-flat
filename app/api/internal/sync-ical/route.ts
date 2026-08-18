@@ -1,6 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { getUnitId } from "@/lib/env";
 import { consumeRateLimit, getRequestIp } from "@/services/rate-limit";
 import { syncAllActiveIcalSources } from "@/services/ical-sync-runner";
 
@@ -55,7 +54,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const result = await syncAllActiveIcalSources(getUnitId(), "scheduled");
+  const result = await syncAllActiveIcalSources(undefined, "scheduled");
 
   return NextResponse.json({ ok: true, ...result });
 }

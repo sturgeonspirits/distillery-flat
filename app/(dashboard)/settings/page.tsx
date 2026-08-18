@@ -3,6 +3,7 @@ import CopyButton from "@/components/ui/CopyButton";
 import NewIcalSourceForm from "@/components/dashboard/NewIcalSourceForm";
 import NewSmartLockForm from "@/components/dashboard/NewSmartLockForm";
 import {
+  createDefaultSmartLocksAction,
   deleteIcalSourceAction,
   deleteSmartLockAction,
   syncAllIcalSourcesAction,
@@ -11,8 +12,13 @@ import {
 import { getIcalSources } from "@/services/ical-sources";
 import { getRecentIcalSyncRuns } from "@/services/ical-sync-runs";
 import { getSmartLocks } from "@/services/locks";
-
-const UNIT_ID = "cdd0a039-ef0a-44b5-a68d-339866029d42";
+import {
+  DISTILLERY_FLATS_DEFAULT_LOCKS,
+  getSmartLockProviderLabel,
+  getSmartLockScopeLabel,
+  smartLockSetupKey,
+} from "@/lib/smart-locks";
+import { getRentalUnitName } from "@/lib/units";
 
 function formatDateTime(value: string | null) {
   if (!value) return "Never";
@@ -28,13 +34,15 @@ function formatDateTime(value: string | null) {
 
 export default async function SettingsPage() {
   const [icalSources, recentRuns, smartLocks] = await Promise.all([
-    getIcalSources(UNIT_ID),
-    getRecentIcalSyncRuns(UNIT_ID, 20),
-    getSmartLocks(UNIT_ID),
+    getIcalSources(),
+    getRecentIcalSyncRuns(undefined, 20),
+    getSmartLocks(),
   ]);
 
   const baseUrl =
+    process.env.APP_URL ||
     process.env.SYNC_BASE_URL ||
+    process.env.URL ||
     process.env.NEXT_PUBLIC_APP_URL ||
     "http://localhost:3000";
 
@@ -43,6 +51,10 @@ export default async function SettingsPage() {
     staffToken && baseUrl
       ? `${baseUrl.replace(/\/$/, "")}/api/staff-calendar?token=${staffToken}`
       : "";
+  const existingDefaultLockKeys = new Set(smartLocks.map(smartLockSetupKey));
+  const missingDefaultLocks = DISTILLERY_FLATS_DEFAULT_LOCKS.filter(
+    (lock) => !existingDefaultLockKeys.has(smartLockSetupKey(lock)),
+  );
 
   return (
     <div className="space-y-6">
@@ -78,17 +90,57 @@ export default async function SettingsPage() {
         ) : (
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
             Missing <code>STAFF_ICAL_TOKEN</code> or base URL. Set{" "}
-            <code>STAFF_ICAL_TOKEN</code> and <code>SYNC_BASE_URL</code> in your
-            environment to generate the subscription link here.
+            <code>STAFF_ICAL_TOKEN</code> in Netlify. The base URL can come
+            from Netlify automatically, or from <code>APP_URL</code> if you want
+            to force a custom domain.
           </div>
         )}
+      </Card>
+
+      <Card
+        title="Distillery Flats Lock Plan"
+        description="Standard Schlage Engage setup for the shared exterior entry and each apartment door"
+      >
+        <div className="space-y-3">
+          <div className="grid gap-3 md:grid-cols-3">
+            {DISTILLERY_FLATS_DEFAULT_LOCKS.map((lock) => (
+              <div
+                key={smartLockSetupKey(lock)}
+                className="rounded-xl border border-stone-200 bg-stone-50 p-4"
+              >
+                <p className="font-medium text-stone-900">{lock.name}</p>
+                <p className="mt-1 text-sm text-stone-600">
+                  {getSmartLockScopeLabel(lock)}
+                </p>
+                <p className="mt-2 text-xs font-medium uppercase tracking-wide text-stone-500">
+                  {getSmartLockProviderLabel(lock.provider)}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          {missingDefaultLocks.length > 0 ? (
+            <form action={createDefaultSmartLocksAction}>
+              <button
+                type="submit"
+                className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm font-medium text-stone-700 hover:bg-stone-50"
+              >
+                Add Missing Standard Locks
+              </button>
+            </form>
+          ) : (
+            <p className="text-sm text-emerald-700">
+              Standard lock set is saved.
+            </p>
+          )}
+        </div>
       </Card>
 
       <NewSmartLockForm />
 
       <Card
         title="Smart Locks"
-        description="Active locks on this unit that can receive pending access codes"
+        description="Lock hardware assigned to each apartment or shared entry"
       >
         <div className="space-y-3">
           {smartLocks.map((lock) => (
@@ -100,7 +152,10 @@ export default async function SettingsPage() {
                 <div className="space-y-1">
                   <p className="font-medium text-stone-900">{lock.name}</p>
                   <p className="text-sm text-stone-600">
-                    Provider: {lock.provider}
+                    Scope: {getSmartLockScopeLabel(lock)}
+                  </p>
+                  <p className="text-sm text-stone-600">
+                    Provider: {getSmartLockProviderLabel(lock.provider)}
                   </p>
                   <p className="text-xs text-stone-500">
                     External ID: {lock.external_lock_id || "Not set"}
@@ -162,6 +217,9 @@ export default async function SettingsPage() {
                     {source.source_name}
                   </p>
                   <p className="break-all text-sm text-stone-600">
+                    Space: {getRentalUnitName(source.unit_id)}
+                  </p>
+                  <p className="break-all text-sm text-stone-600">
                     {source.feed_url}
                   </p>
                   <p className="text-xs text-stone-500">
@@ -219,6 +277,7 @@ export default async function SettingsPage() {
             <thead>
               <tr className="text-left text-stone-500">
                 <th className="px-4 py-3 font-medium">Source</th>
+                <th className="px-4 py-3 font-medium">Space</th>
                 <th className="px-4 py-3 font-medium">Trigger</th>
                 <th className="px-4 py-3 font-medium">Status</th>
                 <th className="px-4 py-3 font-medium">Started</th>
@@ -231,6 +290,9 @@ export default async function SettingsPage() {
               {recentRuns.map((run) => (
                 <tr key={run.id} className="align-top">
                   <td className="px-4 py-4 text-stone-900">{run.source_name}</td>
+                  <td className="px-4 py-4 text-stone-700">
+                    {getRentalUnitName(run.unit_id)}
+                  </td>
                   <td className="px-4 py-4 text-stone-700">{run.trigger}</td>
                   <td className="px-4 py-4 text-stone-700">{run.status}</td>
                   <td className="px-4 py-4 text-stone-700">
@@ -251,7 +313,7 @@ export default async function SettingsPage() {
 
               {recentRuns.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-stone-500">
+                  <td colSpan={8} className="px-4 py-8 text-center text-stone-500">
                     No sync runs yet.
                   </td>
                 </tr>

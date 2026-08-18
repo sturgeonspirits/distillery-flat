@@ -9,10 +9,22 @@ import {
   getNightsNeededToBeatBenchmark,
 } from "@/services/pricing";
 import { getPricingRules } from "@/services/pricing-rules";
+import { getDefaultUnitId, getRentalUnitById, RENTAL_UNITS } from "@/lib/units";
 
-export default async function PricingPage() {
+type PricingPageProps = {
+  searchParams?: Promise<{
+    unit?: string;
+  }>;
+};
+
+export default async function PricingPage({ searchParams }: PricingPageProps) {
+  const resolvedSearchParams = (await searchParams) ?? {};
+  const selectedUnit =
+    getRentalUnitById(resolvedSearchParams.unit) ??
+    getRentalUnitById(getDefaultUnitId())!;
+
   const [pricing, rules] = await Promise.all([
-    getPricingSnapshot(),
+    getPricingSnapshot(selectedUnit.id),
     getPricingRules(),
   ]);
 
@@ -30,10 +42,26 @@ export default async function PricingPage() {
   return (
     <div className="space-y-6">
       <Card
-        title="Base Pricing Settings"
+        title={`Base Pricing Settings: ${selectedUnit.name}`}
         description="These values now live in the database and can be changed here without editing backend code."
       >
-        <BasePricingSettingsForm pricing={pricing} />
+        <div className="mb-4 flex flex-wrap gap-2">
+          {RENTAL_UNITS.map((unit) => (
+            <a
+              key={unit.id}
+              href={`/pricing?unit=${unit.id}`}
+              className={`rounded-full px-3 py-1 text-sm font-medium ${
+                selectedUnit.id === unit.id
+                  ? "bg-stone-900 text-white"
+                  : "bg-stone-100 text-stone-700"
+              }`}
+            >
+              {unit.name}
+            </a>
+          ))}
+        </div>
+
+        <BasePricingSettingsForm pricing={pricing} unitId={selectedUnit.id} />
       </Card>
 
       <Card

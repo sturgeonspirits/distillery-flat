@@ -15,6 +15,8 @@ export const config = {
     "/pricing/:path*",
     "/reports/:path*",
     "/settings/:path*",
+    "/operations/:path*",
+    "/guest-portal/:path*",
     "/api/reservation-preview",
   ],
 };

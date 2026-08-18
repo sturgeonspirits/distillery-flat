@@ -1,6 +1,6 @@
-export const APP_NAME = "Sturgeon Flat App";
+export const APP_NAME = "Distillery Flats";
 
-export const PROPERTY_NAME = "Sturgeon Spirits Distillery Flat";
+export const PROPERTY_NAME = "Sturgeon Spirits Distillery Flats";
 
 export const MONTHLY_RENT_BENCHMARK = 1300;
 
@@ -19,5 +19,5 @@ export const PHASE_1_GOALS = [
   "Track reservations in one place",
   "Maintain a canonical calendar",
   "Set baseline and event pricing",
-  "Measure performance against $1,300 monthly benchmark",
+  "Measure performance against rental benchmarks",
 ] as const;

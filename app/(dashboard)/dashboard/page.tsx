@@ -24,7 +24,7 @@ export default async function DashboardPage() {
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Dashboard</h1>
           <p className="mt-1 text-sm text-zinc-600">
-            Live operating view for the distillery flat.
+            Live operating view for the distillery rentals.
           </p>
         </div>
 
@@ -84,7 +84,7 @@ export default async function DashboardPage() {
             <div>
               <dt className="font-medium text-zinc-900">Listing concept</dt>
               <dd className="mt-1 text-zinc-600">
-                Stay at Sturgeon Spirits | 3BR Distillery Flat + Tasting
+                Stay at Sturgeon Spirits | The Rickhouse and Angel&apos;s Share
               </dd>
             </div>
 
@@ -96,7 +96,7 @@ export default async function DashboardPage() {
             <div>
               <dt className="font-medium text-zinc-900">Current scope</dt>
               <dd className="mt-1 text-zinc-600">
-                One live unit with reservations, owner blocks, pricing, iCal
+                Two live units with reservations, owner blocks, pricing, iCal
                 sync, lock-code workflow, reconciliation review, turnover
                 tracking, staff calendar feed, and protected internal routes.
               </dd>
@@ -105,7 +105,7 @@ export default async function DashboardPage() {
             <div>
               <dt className="font-medium text-zinc-900">Primary data source</dt>
               <dd className="mt-1 text-zinc-600">
-                Supabase reservations and operations tables.
+                Google Sheets through the Apps Script backend.
               </dd>
             </div>
           </dl>

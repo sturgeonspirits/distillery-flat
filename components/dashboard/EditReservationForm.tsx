@@ -4,6 +4,7 @@ import { useActionState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Card from "@/components/ui/Card";
 import { updateReservationAction } from "@/app/(dashboard)/actions";
+import { RENTAL_UNITS } from "@/lib/units";
 import type { Reservation } from "@/types/reservation";
 
 const initialFormActionState = {
@@ -53,6 +54,27 @@ export default function EditReservationForm({
         ) : null}
 
         <div className="grid gap-4 md:grid-cols-2">
+          <div>
+            <label
+              htmlFor="unit_id"
+              className="mb-1 block text-sm font-medium text-stone-900"
+            >
+              Rental Space
+            </label>
+            <select
+              id="unit_id"
+              name="unit_id"
+              defaultValue={reservation.unit_id}
+              className="w-full rounded-xl border border-stone-300 px-3 py-2"
+            >
+              {RENTAL_UNITS.map((unit) => (
+                <option key={unit.id} value={unit.id}>
+                  {unit.name} ({unit.bedrooms}BR)
+                </option>
+              ))}
+            </select>
+          </div>
+
           <div>
             <label
               htmlFor="guest_name"

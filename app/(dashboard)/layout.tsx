@@ -3,6 +3,8 @@ import SidebarNav from "@/components/ui/SidebarNav";
 import { requirePageUser } from "@/lib/auth";
 import { signOutAction } from "@/app/login/actions";
 
+export const dynamic = "force-dynamic";
+
 export default async function DashboardLayout({
   children,
 }: {
@@ -25,7 +27,7 @@ export default async function DashboardLayout({
                   Sturgeon Spirits
                 </p>
                 <h1 className="mt-1 text-2xl font-semibold tracking-tight text-stone-900">
-                  Distillery Flat Operations
+                  Distillery Flats Operations
                 </h1>
               </div>
 

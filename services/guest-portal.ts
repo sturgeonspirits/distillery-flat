@@ -1,4 +1,5 @@
 import { randomBytes } from "crypto";
+import { getDefaultUnitId } from "@/lib/units";
 import { createClient } from "@/supabase/server";
 import { supabaseAdmin } from "@/supabase/admin";
 import type { Reservation } from "@/types/reservation";
@@ -10,7 +11,7 @@ import type {
   GuestPortalLockCode,
 } from "@/types/guest-portal";
 
-const UNIT_ID = "cdd0a039-ef0a-44b5-a68d-339866029d42";
+const UNIT_ID = getDefaultUnitId();
 
 function mapContentRow(row: Record<string, unknown>): GuestPortalContentSection {
   return {
@@ -63,6 +64,7 @@ export function buildGuestPortalUrl(token: string) {
   const base =
     process.env.APP_URL ||
     process.env.SYNC_BASE_URL ||
+    process.env.URL ||
     process.env.NEXT_PUBLIC_APP_URL ||
     "";
 
@@ -72,16 +74,21 @@ export function buildGuestPortalUrl(token: string) {
 }
 
 export async function getGuestPortalContent(
-  unit_id = UNIT_ID,
+  unit_id?: string,
 ): Promise<GuestPortalContentSection[]> {
   const supabase = await createClient();
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("guest_portal_content")
     .select("*")
-    .eq("unit_id", unit_id)
     .order("sort_order", { ascending: true })
     .order("title", { ascending: true });
+
+  if (unit_id) {
+    query = query.eq("unit_id", unit_id);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     throw new Error(`Failed to load guest portal content: ${error.message}`);
@@ -139,15 +146,20 @@ export async function deleteGuestPortalContent(id: string): Promise<void> {
 }
 
 export async function getGuestPortalSessions(
-  unit_id = UNIT_ID,
+  unit_id?: string,
 ): Promise<GuestPortalSession[]> {
   const supabase = await createClient();
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("guest_portal_sessions")
     .select("*")
-    .eq("unit_id", unit_id)
     .order("created_at", { ascending: false });
+
+  if (unit_id) {
+    query = query.eq("unit_id", unit_id);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     throw new Error(`Failed to load guest portal sessions: ${error.message}`);
@@ -247,15 +259,20 @@ export async function revokeGuestPortalSession(id: string): Promise<void> {
 }
 
 export async function getGuestPortalMessageRequests(
-  unit_id = UNIT_ID,
+  unit_id?: string,
 ): Promise<GuestPortalMessageRequest[]> {
   const supabase = await createClient();
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("guest_portal_message_requests")
     .select("*")
-    .eq("unit_id", unit_id)
     .order("created_at", { ascending: false });
+
+  if (unit_id) {
+    query = query.eq("unit_id", unit_id);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     throw new Error(
@@ -354,7 +371,7 @@ export async function getGuestPortalPageData(
     .from("lock_access_codes")
     .select("*")
     .eq("reservation_id", session.reservation_id)
-    .in("status", ["pending", "active"])
+    .eq("status", "active")
     .order("starts_at", { ascending: true });
 
   if (lockCodesError) {

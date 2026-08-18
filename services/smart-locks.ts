@@ -1,4 +1,6 @@
-export type SmartLockProvider = "schlage" | "yale" | "august" | "remoteLock" | "other";
+import type { SmartLockProvider } from "@/lib/smart-locks";
+
+export type { SmartLockProvider };
 
 export type CreateAccessCodeInput = {
   external_lock_id: string;

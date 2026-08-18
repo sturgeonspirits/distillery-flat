@@ -2,9 +2,9 @@ import "./globals.css";
 import type { Metadata, Viewport } from "next";
 
 export const metadata: Metadata = {
-  title: "Distillery Flat",
-  description: "Operations dashboard for Sturgeon Spirits Distillery Flat",
-  applicationName: "Distillery Flat",
+  title: "Distillery Flats",
+  description: "Operations dashboard for Sturgeon Spirits Distillery Flats",
+  applicationName: "Distillery Flats",
   manifest: "/site.webmanifest",
   icons: {
     icon: [
@@ -26,7 +26,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Distillery Flat",
+    title: "Distillery Flats",
   },
   formatDetection: {
     telephone: false,

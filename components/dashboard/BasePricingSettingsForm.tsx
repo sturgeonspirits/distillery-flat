@@ -3,11 +3,13 @@ import type { PricingSnapshot } from "@/types/pricing";
 
 type Props = {
   pricing: PricingSnapshot;
+  unitId: string;
 };
 
-export default function BasePricingSettingsForm({ pricing }: Props) {
+export default function BasePricingSettingsForm({ pricing, unitId }: Props) {
   return (
     <form action={updatePricingSettingsAction} className="space-y-4">
+      <input type="hidden" name="unit_id" value={unitId} />
       <div className="grid gap-4 md:grid-cols-2">
         <div>
           <label

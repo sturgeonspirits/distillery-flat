@@ -1,5 +1,6 @@
 import Card from "@/components/ui/Card";
 import { formatCurrency, formatDate } from "@/lib/format";
+import { getRentalUnitName } from "@/lib/units";
 import { getBookedNights, getReservationRevenue } from "@/services/reservations";
 import type { Reservation } from "@/types/reservation";
 
@@ -45,6 +46,9 @@ export default function ReservationTable({
                 Channel
               </th>
               <th className="px-4 py-3 text-left font-medium text-stone-600">
+                Space
+              </th>
+              <th className="px-4 py-3 text-left font-medium text-stone-600">
                 Stay
               </th>
               <th className="px-4 py-3 text-left font-medium text-stone-600">
@@ -69,6 +73,9 @@ export default function ReservationTable({
                 </td>
                 <td className="px-4 py-4 text-stone-700">
                   {reservation.channel}
+                </td>
+                <td className="px-4 py-4 text-stone-700">
+                  {getRentalUnitName(reservation.unit_id)}
                 </td>
                 <td className="px-4 py-4 text-stone-700">
                   {formatDate(reservation.check_in)} –{" "}

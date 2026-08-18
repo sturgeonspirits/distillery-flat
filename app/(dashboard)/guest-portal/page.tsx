@@ -8,6 +8,7 @@ import {
   resolveGuestPortalMessageRequestAction,
 } from "@/app/(dashboard)/actions";
 import { formatDate } from "@/lib/format";
+import { getRentalUnitName } from "@/lib/units";
 import { getReservations } from "@/services/reservations";
 import {
   buildGuestPortalUrl,
@@ -125,6 +126,7 @@ export default async function GuestPortalDashboardPage() {
                     {section.body}
                   </p>
                   <p className="mt-3 text-xs text-stone-500">
+                    {getRentalUnitName(section.unit_id)} ·{" "}
                     Sort order: {section.sort_order} ·{" "}
                     {section.is_active ? "Active" : "Inactive"}
                   </p>
@@ -233,6 +235,7 @@ export default async function GuestPortalDashboardPage() {
                 <tr className="text-left text-xs uppercase tracking-wide text-stone-500">
                   <th className="px-3 py-2">Guest</th>
                   <th className="px-3 py-2">Dates</th>
+                  <th className="px-3 py-2">Space</th>
                   <th className="px-3 py-2">Channel</th>
                   <th className="px-3 py-2">Portal Link</th>
                   <th className="px-3 py-2">Last Access</th>
@@ -261,6 +264,10 @@ export default async function GuestPortalDashboardPage() {
                       <td className="px-3 py-3 text-stone-700">
                         {formatDate(reservation.check_in)} –{" "}
                         {formatDate(reservation.check_out)}
+                      </td>
+
+                      <td className="px-3 py-3 text-stone-700">
+                        {getRentalUnitName(reservation.unit_id)}
                       </td>
 
                       <td className="px-3 py-3 text-stone-700">

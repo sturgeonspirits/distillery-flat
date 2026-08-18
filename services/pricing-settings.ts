@@ -1,12 +1,11 @@
 import { MOCK_PRICING } from "@/lib/mock-data";
+import { assertRentalUnitId, getDefaultUnitId } from "@/lib/units";
 import { createClient } from "@/supabase/server";
 import type { PricingSettings } from "@/types/pricing-settings";
 
-const UNIT_ID = "cdd0a039-ef0a-44b5-a68d-339866029d42";
-
-function defaultPricingSettings(): PricingSettings {
+function defaultPricingSettings(unit_id = getDefaultUnitId()): PricingSettings {
   return {
-    unit_id: UNIT_ID,
+    unit_id,
     base_weekday_rate: MOCK_PRICING.baseWeekdayRate,
     base_weekend_rate: MOCK_PRICING.baseWeekendRate,
     distillery_premium: MOCK_PRICING.distilleryPremium,
@@ -30,32 +29,34 @@ function mapPricingSettingsRow(row: Record<string, unknown>): PricingSettings {
   };
 }
 
-export async function getPricingSettings(): Promise<PricingSettings> {
+export async function getPricingSettings(unit_id = getDefaultUnitId()): Promise<PricingSettings> {
+  assertRentalUnitId(unit_id);
   const supabase = await createClient();
 
   const { data, error } = await supabase
     .from("pricing_settings")
     .select("*")
-    .eq("unit_id", UNIT_ID)
+    .eq("unit_id", unit_id)
     .maybeSingle();
 
   if (error) {
     const code = (error as { code?: string }).code;
     if (code === "42P01") {
-      return defaultPricingSettings();
+      return defaultPricingSettings(unit_id);
     }
 
     throw new Error(`Failed to load pricing settings: ${error.message}`);
   }
 
   if (!data) {
-    return defaultPricingSettings();
+    return defaultPricingSettings(unit_id);
   }
 
   return mapPricingSettingsRow(data as Record<string, unknown>);
 }
 
 export async function upsertPricingSettings(input: {
+  unit_id?: string;
   base_weekday_rate: number;
   base_weekend_rate: number;
   distillery_premium: number;
@@ -63,10 +64,11 @@ export async function upsertPricingSettings(input: {
   cleaning_fee: number;
   benchmark_monthly_rent: number;
 }): Promise<PricingSettings> {
+  const unit_id = assertRentalUnitId(input.unit_id ?? getDefaultUnitId());
   const supabase = await createClient();
 
   const payload = {
-    unit_id: UNIT_ID,
+    unit_id,
     base_weekday_rate: input.base_weekday_rate,
     base_weekend_rate: input.base_weekend_rate,
     distillery_premium: input.distillery_premium,

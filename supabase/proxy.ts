@@ -1,7 +1,6 @@
-import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { isPasswordAuthDisabled } from "@/lib/auth-bypass";
-import { getSupabasePublishableKey, getSupabaseUrl } from "@/lib/env";
+import { SESSION_COOKIE_NAME, verifySessionToken } from "@/lib/session-token";
 
 const PROTECTED_PREFIXES = [
   "/dashboard",
@@ -12,6 +11,7 @@ const PROTECTED_PREFIXES = [
   "/reports",
   "/settings",
   "/operations",
+  "/guest-portal",
 ];
 
 function isProtectedPath(pathname: string) {
@@ -25,7 +25,6 @@ function isProtectedApi(pathname: string) {
 }
 
 export async function updateSession(request: NextRequest) {
-  let response = NextResponse.next({ request });
   const pathname = request.nextUrl.pathname;
 
   if (isPasswordAuthDisabled()) {
@@ -33,39 +32,15 @@ export async function updateSession(request: NextRequest) {
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }
 
+    const response = NextResponse.next({ request });
     response.headers.set("Cache-Control", "private, no-store");
 
     return response;
   }
 
-  const supabase = createServerClient(
-    getSupabaseUrl(),
-    getSupabasePublishableKey(),
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => {
-            request.cookies.set(name, value);
-          });
-
-          response = NextResponse.next({ request });
-
-          cookiesToSet.forEach(({ name, value, options }) => {
-            response.cookies.set(name, value, options);
-          });
-        },
-      },
-    },
+  const user = await verifySessionToken(
+    request.cookies.get(SESSION_COOKIE_NAME)?.value,
   );
-
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
   const needsAuth = isProtectedPath(pathname) || isProtectedApi(pathname);
 
   if (!user && needsAuth) {
@@ -75,6 +50,7 @@ export async function updateSession(request: NextRequest) {
       "next",
       `${request.nextUrl.pathname}${request.nextUrl.search}`,
     );
+
     return NextResponse.redirect(loginUrl);
   }
 
@@ -82,11 +58,8 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
-  if (error) {
-    response.headers.set("Cache-Control", "private, no-store");
-    return response;
-  }
-
+  const response = NextResponse.next({ request });
   response.headers.set("Cache-Control", "private, no-store");
+
   return response;
 }

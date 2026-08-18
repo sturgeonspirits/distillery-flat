@@ -1,10 +1,10 @@
+import { getRentalUnitName, RENTAL_UNITS } from "@/lib/units";
 import { getOwnerBlocks } from "@/services/owner-blocks";
 import { getReservations } from "@/services/reservations";
 import { getTurnoverChecklistsForDates } from "@/services/turnovers";
 import type { TurnoverStatus } from "@/types/turnover";
 
 const PROPERTY_TIME_ZONE = process.env.PROPERTY_TIME_ZONE || "America/Chicago";
-const UNIT_ID = "cdd0a039-ef0a-44b5-a68d-339866029d42";
 
 type LockAccessCodeLike = {
   status?: string | null;
@@ -23,6 +23,7 @@ type ReservationLike = {
   channel?: string | null;
   source?: string | null;
   external_channel?: string | null;
+  unit_id?: string | null;
   reconciliation_status?: string | null;
   lock_access_codes?: LockAccessCodeLike[] | null;
 };
@@ -34,6 +35,7 @@ type OwnerBlockLike = {
   start_date?: string | null;
   end_date?: string | null;
   status?: string | null;
+  unit_id?: string | null;
 };
 
 export type OperationsReservation = ReservationLike & {
@@ -51,6 +53,7 @@ export type OperationsOwnerBlock = OwnerBlockLike & {
 
 export type TurnoverItem = {
   id: string;
+  unit_id: string;
   date_key: string;
   date_label: string;
   priority: "high" | "medium" | "low";
@@ -162,17 +165,18 @@ function blockTouchesDate(block: OperationsOwnerBlock, dateKey: string) {
 
 function hasUsableLockCode(codes?: LockAccessCodeLike[] | null) {
   return (codes ?? []).some((code) =>
-    ["pending", "active", "created"].includes((code.status ?? "").toLowerCase()),
+    (code.status ?? "").toLowerCase() === "active",
   );
 }
 
 function buildBaseTurnoverItemsForDate(args: {
+  unitId: string;
   dateKey: string;
   dateLabel: string;
   arrivals: OperationsReservation[];
   departures: OperationsReservation[];
 }) {
-  const { dateKey, dateLabel, arrivals, departures } = args;
+  const { unitId, dateKey, dateLabel, arrivals, departures } = args;
   const items: Omit<TurnoverItem, "checklist_status" | "checklist_notes">[] = [];
 
   const arrival = arrivals[0];
@@ -180,13 +184,14 @@ function buildBaseTurnoverItemsForDate(args: {
 
   if (arrival && departure) {
     items.push({
-      id: `turnover-${dateKey}`,
+      id: `turnover-${unitId}-${dateKey}`,
+      unit_id: unitId,
       date_key: dateKey,
       date_label: dateLabel,
       priority: "high",
       kind: "same_day_turnover",
       title: `Same-day turnover ${dateLabel}`,
-      detail: `${departure.guest_display_name} departs, ${arrival.guest_display_name} arrives`,
+      detail: `${getRentalUnitName(unitId)}: ${departure.guest_display_name} departs, ${arrival.guest_display_name} arrives`,
       reservation_ids: [departure.id, arrival.id],
     });
     return items;
@@ -194,26 +199,28 @@ function buildBaseTurnoverItemsForDate(args: {
 
   if (departure) {
     items.push({
-      id: `checkout-clean-${dateKey}`,
+      id: `checkout-clean-${unitId}-${dateKey}`,
+      unit_id: unitId,
       date_key: dateKey,
       date_label: dateLabel,
       priority: "medium",
       kind: "checkout_clean",
       title: `Checkout clean ${dateLabel}`,
-      detail: `${departure.guest_display_name} departs`,
+      detail: `${getRentalUnitName(unitId)}: ${departure.guest_display_name} departs`,
       reservation_ids: [departure.id],
     });
   }
 
   if (arrival) {
     items.push({
-      id: `arrival-prep-${dateKey}`,
+      id: `arrival-prep-${unitId}-${dateKey}`,
+      unit_id: unitId,
       date_key: dateKey,
       date_label: dateLabel,
       priority: departure ? "medium" : "low",
       kind: "arrival_prep",
       title: `Arrival prep ${dateLabel}`,
-      detail: `${arrival.guest_display_name} arrives`,
+      detail: `${getRentalUnitName(unitId)}: ${arrival.guest_display_name} arrives`,
       reservation_ids: [arrival.id],
     });
   }
@@ -301,32 +308,42 @@ export async function getOperationsSnapshot(
     blockTouchesDate(block, tomorrowKey),
   );
 
-  const baseTurnoverItems = [
+  const baseTurnoverItems = RENTAL_UNITS.flatMap((unit) => [
     ...buildBaseTurnoverItemsForDate({
+      unitId: unit.id,
       dateKey: todayKey,
       dateLabel: "today",
-      arrivals: arrivalsToday,
-      departures: departuresToday,
+      arrivals: arrivalsToday.filter((reservation) => reservation.unit_id === unit.id),
+      departures: departuresToday.filter((reservation) => reservation.unit_id === unit.id),
     }),
     ...buildBaseTurnoverItemsForDate({
+      unitId: unit.id,
       dateKey: tomorrowKey,
       dateLabel: "tomorrow",
-      arrivals: arrivalsTomorrow,
-      departures: departuresTomorrow,
+      arrivals: arrivalsTomorrow.filter((reservation) => reservation.unit_id === unit.id),
+      departures: departuresTomorrow.filter((reservation) => reservation.unit_id === unit.id),
     }),
-  ];
+  ]);
 
-  const turnoverChecklists = await getTurnoverChecklistsForDates({
-    unit_id: UNIT_ID,
-    dates: baseTurnoverItems.map((item) => item.date_key),
-  });
+  const turnoverChecklists = (
+    await Promise.all(
+      RENTAL_UNITS.map((unit) =>
+        getTurnoverChecklistsForDates({
+          unit_id: unit.id,
+          dates: baseTurnoverItems
+            .filter((item) => item.unit_id === unit.id)
+            .map((item) => item.date_key),
+        }),
+      ),
+    )
+  ).flat();
 
   const checklistByDate = new Map(
-    turnoverChecklists.map((item) => [item.turnover_date, item]),
+    turnoverChecklists.map((item) => [`${item.unit_id}:${item.turnover_date}`, item]),
   );
 
   const turnoverItems: TurnoverItem[] = baseTurnoverItems.map((item) => {
-    const checklist = checklistByDate.get(item.date_key);
+    const checklist = checklistByDate.get(`${item.unit_id}:${item.date_key}`);
 
     return {
       ...item,

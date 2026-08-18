@@ -84,15 +84,20 @@ export async function finishIcalSyncRunError(input: {
 }
 
 export async function getRecentIcalSyncRuns(
-  unit_id: string,
+  unit_id?: string,
   limit = 20,
 ): Promise<IcalSyncRun[]> {
-  const { data, error } = await supabaseAdmin
+  let query = supabaseAdmin
     .from("ical_sync_runs")
     .select("*")
-    .eq("unit_id", unit_id)
     .order("started_at", { ascending: false })
     .limit(limit);
+
+  if (unit_id) {
+    query = query.eq("unit_id", unit_id);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     throw new Error(`Failed to load iCal sync runs: ${error.message}`);

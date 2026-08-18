@@ -223,6 +223,7 @@ function TurnoverCard({ items }: { items: TurnoverItem[] }) {
                 className="rounded-xl border border-zinc-200 p-4"
               >
                 <input type="hidden" name="turnoverDate" value={item.date_key} />
+                <input type="hidden" name="unit_id" value={item.unit_id} />
 
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge
@@ -286,13 +287,13 @@ function TurnoverCard({ items }: { items: TurnoverItem[] }) {
 
                 <div className="mt-4">
                   <label
-                    htmlFor={`notes-${item.date_key}`}
+                    htmlFor={`notes-${item.id}`}
                     className="block text-sm font-medium text-zinc-900"
                   >
                     Turnover notes
                   </label>
                   <textarea
-                    id={`notes-${item.date_key}`}
+                    id={`notes-${item.id}`}
                     name="notes"
                     defaultValue={item.checklist_notes ?? ""}
                     rows={3}

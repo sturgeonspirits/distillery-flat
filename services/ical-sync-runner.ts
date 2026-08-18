@@ -65,7 +65,7 @@ export async function syncIcalSourceWithMonitoring(
 }
 
 export async function syncAllActiveIcalSources(
-  unit_id: string,
+  unit_id: string | undefined,
   trigger: "manual" | "scheduled",
 ) {
   const sources = await getActiveIcalSources(unit_id);

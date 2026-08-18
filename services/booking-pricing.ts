@@ -1,4 +1,5 @@
 import { getPricingRules } from "@/services/pricing-rules";
+import { getPricingSnapshot, getDefaultNightlyRateForDate } from "@/services/pricing";
 
 type PricingRule = {
   id: string;
@@ -83,10 +84,14 @@ function pickHighestPriorityRule(
 export async function getStayPricing(
   check_in: string,
   check_out: string,
+  unit_id?: string,
 ): Promise<StayPricingResult> {
   assertValidDateRange(check_in, check_out);
 
-  const rules = (await getPricingRules()) as PricingRule[];
+  const [rules, pricingSnapshot] = await Promise.all([
+    getPricingRules() as Promise<PricingRule[]>,
+    getPricingSnapshot(unit_id),
+  ]);
   const nights = nightsBetween(check_in, check_out);
   const stayDates = getStayDates(check_in, check_out);
 
@@ -108,7 +113,9 @@ export async function getStayPricing(
       return (a.start_date ?? "").localeCompare(b.start_date ?? "");
     })[0] ?? null;
 
-  const nightly_rate = stayRule?.nightly_rate ?? 0;
+  const nightly_rate =
+    stayRule?.nightly_rate ??
+    getDefaultNightlyRateForDate(check_in, pricingSnapshot);
   const min_stay = stayRule?.min_stay ?? 1;
 
   return {
@@ -122,8 +129,9 @@ export async function getStayPricing(
 export async function assertStayMeetsMinimum(
   check_in: string,
   check_out: string,
+  unit_id?: string,
 ) {
-  const pricing = await getStayPricing(check_in, check_out);
+  const pricing = await getStayPricing(check_in, check_out, unit_id);
 
   if (pricing.nights < pricing.min_stay) {
     const ruleName = pricing.rule?.name ? ` for ${pricing.rule.name}` : "";

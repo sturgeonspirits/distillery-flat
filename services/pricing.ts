@@ -2,8 +2,8 @@ import type { PricingSnapshot } from "@/types/pricing";
 import type { PricingRule } from "@/types/pricing-rule";
 import { getPricingSettings } from "@/services/pricing-settings";
 
-export async function getPricingSnapshot(): Promise<PricingSnapshot> {
-  const settings = await getPricingSettings();
+export async function getPricingSnapshot(unit_id?: string): Promise<PricingSnapshot> {
+  const settings = await getPricingSettings(unit_id);
 
   return {
     baseWeekdayRate: settings.base_weekday_rate,

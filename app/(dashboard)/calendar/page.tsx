@@ -6,6 +6,7 @@ import { getOwnerBlocks } from "@/services/owner-blocks";
 import { getPricingRules } from "@/services/pricing-rules";
 import { deleteOwnerBlockAction } from "@/app/(dashboard)/actions";
 import { formatCurrency, formatDate } from "@/lib/format";
+import { getRentalUnitName } from "@/lib/units";
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -146,11 +147,11 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
 
     const key = toDateKey(date);
 
-    const ownerBlock = ownerBlocks.find((block) =>
+    const ownerBlocksForDay = ownerBlocks.filter((block) =>
       isStayDateInRange(key, block.start_date, block.end_date),
     );
 
-    const reservation = reservations.find(
+    const reservationsForDay = reservations.filter(
       (reservation) =>
         reservation.status !== "cancelled" &&
         isStayDateInRange(key, reservation.check_in, reservation.check_out),
@@ -173,8 +174,8 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
       dayNumber: date.getUTCDate(),
       isCurrentMonth,
       isToday,
-      ownerBlock,
-      reservation,
+      ownerBlocks: ownerBlocksForDay,
+      reservations: reservationsForDay,
       pricingRule,
     };
   });
@@ -191,7 +192,7 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
 
       <Card
         title={monthLabel}
-        description="Occupancy and pricing view for the distillery flat"
+        description="Occupancy and pricing view for both distillery rentals"
       >
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap gap-3 text-sm text-stone-600">
@@ -254,9 +255,11 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
           ))}
 
           {days.map((day) => {
-            const fillClass = day.ownerBlock
+            const hasOwnerBlock = day.ownerBlocks.length > 0;
+            const hasReservation = day.reservations.length > 0;
+            const fillClass = hasOwnerBlock
               ? "border-amber-200 bg-amber-50"
-              : day.reservation
+              : hasReservation
                 ? "border-blue-200 bg-blue-50"
                 : "border-stone-200 bg-white";
 
@@ -276,13 +279,13 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
                     {day.dayNumber}
                   </p>
 
-                  {day.ownerBlock ? (
+                  {hasOwnerBlock ? (
                     <span className="rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-medium text-white">
-                      Blocked
+                      {day.ownerBlocks.length} blocked
                     </span>
-                  ) : day.reservation ? (
+                  ) : hasReservation ? (
                     <span className="rounded-full bg-blue-500 px-2 py-0.5 text-[10px] font-medium text-white">
-                      Booked
+                      {day.reservations.length} booked
                     </span>
                   ) : (
                     <span className="rounded-full bg-emerald-500 px-2 py-0.5 text-[10px] font-medium text-white">
@@ -319,27 +322,28 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
                     <p className="text-xs text-stone-500">No pricing rule</p>
                   )}
 
-                  {day.ownerBlock ? (
-                    <>
-                      <p className="pt-1 text-xs font-medium text-stone-900">
-                        {day.ownerBlock.title}
-                      </p>
-                      {day.ownerBlock.reason ? (
-                        <p className="text-xs text-stone-600">
-                          {day.ownerBlock.reason}
-                        </p>
-                      ) : null}
-                    </>
-                  ) : day.reservation ? (
-                    <>
-                      <p className="pt-1 text-xs font-medium text-stone-900">
-                        {day.reservation.guest_name}
+                  {day.ownerBlocks.map((block) => (
+                    <div key={block.id} className="pt-1">
+                      <p className="text-xs font-medium text-stone-900">
+                        {block.title}
                       </p>
                       <p className="text-xs text-stone-600">
-                        {day.reservation.channel}
+                        {getRentalUnitName(block.unit_id)}
                       </p>
-                    </>
-                  ) : null}
+                    </div>
+                  ))}
+
+                  {day.reservations.map((reservation) => (
+                    <div key={reservation.id} className="pt-1">
+                      <p className="text-xs font-medium text-stone-900">
+                        {reservation.guest_name}
+                      </p>
+                      <p className="text-xs text-stone-600">
+                        {getRentalUnitName(reservation.unit_id)} ·{" "}
+                        {reservation.channel}
+                      </p>
+                    </div>
+                  ))}
                 </div>
               </div>
             );
@@ -360,6 +364,9 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
               <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                 <div>
                   <p className="font-medium text-stone-900">{block.title}</p>
+                  <p className="mt-1 text-sm text-stone-600">
+                    {getRentalUnitName(block.unit_id)}
+                  </p>
                   <p className="mt-1 text-sm text-stone-600">
                     {formatDate(block.start_date)} – {formatDate(block.end_date)}
                   </p>

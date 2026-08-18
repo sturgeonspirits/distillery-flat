@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 import Card from "@/components/ui/Card";
 import { createReservationAction } from "@/app/(dashboard)/actions";
+import { getDefaultUnitId, RENTAL_UNITS } from "@/lib/units";
 
 const initialFormActionState = {
   ok: false,
@@ -34,6 +35,7 @@ type PreviewState =
 
 type NewReservationFormProps = {
   defaultCleaningFee: number;
+  defaultCleaningFeesByUnit?: Record<string, number>;
 };
 
 function formatMoney(value: number) {
@@ -54,6 +56,7 @@ function formatShortDate(value: string) {
 
 export default function NewReservationForm({
   defaultCleaningFee,
+  defaultCleaningFeesByUnit = {},
 }: NewReservationFormProps) {
   const [state, formAction, isPending] = useActionState(
     createReservationAction,
@@ -62,20 +65,24 @@ export default function NewReservationForm({
   const formRef = useRef<HTMLFormElement | null>(null);
   const [checkIn, setCheckIn] = useState("");
   const [checkOut, setCheckOut] = useState("");
+  const [unitId, setUnitId] = useState(getDefaultUnitId());
   const [preview, setPreview] = useState<PreviewState>({ status: "idle" });
 
   useEffect(() => {
     if (state.ok) {
       formRef.current?.reset();
-      setCheckIn("");
-      setCheckOut("");
-      setPreview({ status: "idle" });
+      queueMicrotask(() => {
+        setCheckIn("");
+        setCheckOut("");
+        setUnitId(getDefaultUnitId());
+        setPreview({ status: "idle" });
+      });
     }
   }, [state.ok]);
 
   useEffect(() => {
     if (!checkIn || !checkOut) {
-      setPreview({ status: "idle" });
+      queueMicrotask(() => setPreview({ status: "idle" }));
       return;
     }
 
@@ -86,7 +93,7 @@ export default function NewReservationForm({
 
       try {
         const response = await fetch(
-          `/api/reservation-preview?check_in=${encodeURIComponent(checkIn)}&check_out=${encodeURIComponent(checkOut)}`,
+          `/api/reservation-preview?unit_id=${encodeURIComponent(unitId)}&check_in=${encodeURIComponent(checkIn)}&check_out=${encodeURIComponent(checkOut)}`,
           {
             method: "GET",
             cache: "no-store",
@@ -120,7 +127,7 @@ export default function NewReservationForm({
     loadPreview();
 
     return () => controller.abort();
-  }, [checkIn, checkOut]);
+  }, [checkIn, checkOut, unitId]);
 
   const previewBlocksSubmit =
     preview.status === "ready" &&
@@ -132,6 +139,8 @@ export default function NewReservationForm({
     preview.status === "ready" && preview.data.nightly_rate > 0
       ? preview.data.nightly_rate * preview.data.nights
       : null;
+  const selectedCleaningFee =
+    defaultCleaningFeesByUnit[unitId] ?? defaultCleaningFee;
 
   return (
     <Card
@@ -152,6 +161,28 @@ export default function NewReservationForm({
         ) : null}
 
         <div className="grid gap-4 md:grid-cols-2">
+          <div>
+            <label
+              htmlFor="unit_id"
+              className="mb-1 block text-sm font-medium text-stone-900"
+            >
+              Rental Space
+            </label>
+            <select
+              id="unit_id"
+              name="unit_id"
+              value={unitId}
+              onChange={(event) => setUnitId(event.target.value)}
+              className="w-full rounded-xl border border-stone-300 px-3 py-2"
+            >
+              {RENTAL_UNITS.map((unit) => (
+                <option key={unit.id} value={unit.id}>
+                  {unit.name} ({unit.bedrooms}BR)
+                </option>
+              ))}
+            </select>
+          </div>
+
           <div>
             <label
               htmlFor="guest_name"
@@ -296,7 +327,7 @@ export default function NewReservationForm({
                   Cleaning fee default
                 </p>
                 <p className="mt-1 text-lg font-semibold text-stone-900">
-                  {formatMoney(defaultCleaningFee)}
+                  {formatMoney(selectedCleaningFee)}
                 </p>
               </div>
             </div>
@@ -401,11 +432,12 @@ export default function NewReservationForm({
             </label>
             <input
               id="cleaning_fee"
+              key={unitId}
               name="cleaning_fee"
               type="number"
               min="0"
               step="0.01"
-              defaultValue={defaultCleaningFee}
+              defaultValue={selectedCleaningFee}
               className="w-full rounded-xl border border-stone-300 px-3 py-2"
             />
             <p className="mt-1 text-xs text-stone-500">

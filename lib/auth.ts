@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getPasswordBypassUser, isPasswordAuthDisabled } from "@/lib/auth-bypass";
-import { createClient } from "@/supabase/server";
+import { getCurrentSessionUser } from "@/lib/session-auth";
 
 export class UnauthorizedError extends Error {
   constructor(message = "You must be signed in.") {
@@ -14,17 +14,7 @@ export async function getCurrentUser() {
     return getPasswordBypassUser();
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  if (error || !user) {
-    return null;
-  }
-
-  return user;
+  return getCurrentSessionUser();
 }
 
 export async function requireUser() {

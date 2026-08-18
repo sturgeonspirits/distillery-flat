@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useRef } from "react";
 import { upsertGuestPortalContentAction } from "@/app/(dashboard)/actions";
+import { getDefaultUnitId, RENTAL_UNITS } from "@/lib/units";
 
 const initialState = {
   ok: false,
@@ -36,6 +37,27 @@ export default function NewGuestPortalSectionForm() {
       ) : null}
 
       <div className="grid gap-4 md:grid-cols-2">
+        <div>
+          <label
+            htmlFor="unit_id"
+            className="mb-1 block text-sm font-medium text-stone-900"
+          >
+            Rental Space
+          </label>
+          <select
+            id="unit_id"
+            name="unit_id"
+            defaultValue={getDefaultUnitId()}
+            className="w-full rounded-xl border border-stone-300 px-3 py-2"
+          >
+            {RENTAL_UNITS.map((unit) => (
+              <option key={unit.id} value={unit.id}>
+                {unit.name} ({unit.bedrooms}BR)
+              </option>
+            ))}
+          </select>
+        </div>
+
         <div>
           <label
             htmlFor="section_key"
