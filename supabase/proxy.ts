@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { isPasswordAuthDisabled } from "@/lib/auth-bypass";
 import { getSupabasePublishableKey, getSupabaseUrl } from "@/lib/env";
 
 const PROTECTED_PREFIXES = [
@@ -25,6 +26,17 @@ function isProtectedApi(pathname: string) {
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
+  const pathname = request.nextUrl.pathname;
+
+  if (isPasswordAuthDisabled()) {
+    if (pathname === "/login") {
+      return NextResponse.redirect(new URL("/dashboard", request.url));
+    }
+
+    response.headers.set("Cache-Control", "private, no-store");
+
+    return response;
+  }
 
   const supabase = createServerClient(
     getSupabaseUrl(),
@@ -54,7 +66,6 @@ export async function updateSession(request: NextRequest) {
     error,
   } = await supabase.auth.getUser();
 
-  const pathname = request.nextUrl.pathname;
   const needsAuth = isProtectedPath(pathname) || isProtectedApi(pathname);
 
   if (!user && needsAuth) {

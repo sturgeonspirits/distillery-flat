@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { getPasswordBypassUser, isPasswordAuthDisabled } from "@/lib/auth-bypass";
 import { createClient } from "@/supabase/server";
 
 export class UnauthorizedError extends Error {
@@ -9,6 +10,10 @@ export class UnauthorizedError extends Error {
 }
 
 export async function getCurrentUser() {
+  if (isPasswordAuthDisabled()) {
+    return getPasswordBypassUser();
+  }
+
   const supabase = await createClient();
   const {
     data: { user },

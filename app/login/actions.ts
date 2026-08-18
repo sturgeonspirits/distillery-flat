@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { isPasswordAuthDisabled } from "@/lib/auth-bypass";
 import { createClient } from "@/supabase/server";
 
 export type SignInState = {
@@ -11,6 +12,10 @@ export async function signInAction(
   _prevState: SignInState,
   formData: FormData,
 ): Promise<SignInState> {
+  if (isPasswordAuthDisabled()) {
+    redirect("/dashboard");
+  }
+
   const email = String(formData.get("email") || "").trim();
   const password = String(formData.get("password") || "");
   const next = String(formData.get("next") || "/dashboard");
@@ -33,6 +38,10 @@ export async function signInAction(
 }
 
 export async function signOutAction() {
+  if (isPasswordAuthDisabled()) {
+    redirect("/dashboard");
+  }
+
   const supabase = await createClient();
   await supabase.auth.signOut();
   redirect("/login");
